@@ -20,6 +20,15 @@ def load_firms(path: Path) -> pd.DataFrame:
     df["longitude"] = pd.to_numeric(df["longitude"], errors="coerce")
     df["acq_date"] = pd.to_datetime(df["acq_date"], errors="coerce")
     df["acq_time"] = pd.to_numeric(df["acq_time"], errors="coerce")
+    df["frp"] = pd.to_numeric(df["frp"], errors="coerce")
+
+    # FIRMS confidence is categorical in this export (for example l/n/h).
+    # Convert it to an ordinal score only for aggregation; retain no fire-label information.
+    confidence_raw = df["confidence"].astype("string").str.strip().str.lower()
+    confidence_map = {"l": 0.25, "n": 0.50, "h": 1.00}
+    df["confidence_score"] = confidence_raw.map(confidence_map)
+    df["confidence_score"] = pd.to_numeric(df["confidence_score"], errors="coerce")
+
     df = df.dropna(subset=["latitude", "longitude", "acq_date", "acq_time"])
     # Approximate India bounding box; final studies should document this geographic filter.
     df = df[(df.latitude >= 6) & (df.latitude <= 37) & (df.longitude >= 68) & (df.longitude <= 98)]
@@ -34,7 +43,7 @@ def aggregate(df: pd.DataFrame) -> pd.DataFrame:
         df.groupby(["grid_lat", "grid_lon", "acq_date", "hour"], as_index=False)
         .agg(
             fire_detections=("latitude", "size"),
-            mean_confidence=("confidence", "mean"),
+            mean_confidence=("confidence_score", "mean"),
             max_frp=("frp", "max"),
         )
     )
