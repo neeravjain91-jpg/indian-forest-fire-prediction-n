@@ -31,23 +31,23 @@ def request_weather(points: list[tuple[float, float]], start: pd.Timestamp, end:
         "precipitation_unit": "mm",
         "cell_selection": "land",
     }
-    for attempt in range(8):
+    # Keep individual failures short. A failed batch is skipped and can be
+    # retried later; it must never block the whole research pipeline.
+    for attempt in range(3):
         try:
-            r = requests.get(API, params=params, timeout=180)
+            r = requests.get(API, params=params, timeout=(10, 45))
             if r.status_code == 429:
-                wait = min(600, 60 * (attempt + 1))
-                time.sleep(wait)
+                time.sleep(15 * (attempt + 1))
                 continue
             if r.status_code in (502, 503, 504):
-                time.sleep(min(240, 30 * (attempt + 1)))
+                time.sleep(10 * (attempt + 1))
                 continue
             r.raise_for_status()
             payload = r.json()
             return payload if isinstance(payload, list) else [payload]
-        except requests.RequestException:
-            if attempt == 7:
-                return []
-            time.sleep(min(240, 30 * (attempt + 1)))
+        except (requests.RequestException, ValueError):
+            if attempt < 2:
+                time.sleep(5 * (attempt + 1))
     return []
 
 
@@ -97,7 +97,7 @@ def sample_nonfire(fire: pd.DataFrame, seed: int) -> pd.DataFrame:
     return pd.DataFrame(rows)
 
 
-def build_weather(df: pd.DataFrame, cache_path: Path, batch_size: int = 50, pause: float = 2.0) -> pd.DataFrame:
+def build_weather(df: pd.DataFrame, cache_path: Path, batch_size: int = 10, pause: float = 0.5) -> pd.DataFrame:
     cache = {}
     if cache_path.exists():
         old = pd.read_csv(cache_path)
@@ -114,6 +114,8 @@ def build_weather(df: pd.DataFrame, cache_path: Path, batch_size: int = 50, paus
         week = pd.Timestamp(k[2]) - pd.Timedelta(days=pd.Timestamp(k[2]).dayofweek)
         groups.setdefault(week.strftime("%Y-%m-%d"), []).append(k)
 
+    failed_batches = []
+    total = len(groups)
     for block_no, (week_key, block_keys) in enumerate(groups.items(), 1):
         start = pd.Timestamp(week_key) - pd.Timedelta(days=7)
         end = pd.Timestamp(week_key) + pd.Timedelta(days=6)
@@ -121,6 +123,9 @@ def build_weather(df: pd.DataFrame, cache_path: Path, batch_size: int = 50, paus
         for i in range(0, len(coords), batch_size):
             batch = coords[i:i + batch_size]
             payloads = request_weather(batch, start, end)
+            if not payloads:
+                failed_batches.append((week_key, batch))
+                continue
             for (lat, lon), payload in zip(batch, payloads):
                 hourly = payload.get("hourly", {}) if isinstance(payload, dict) else {}
                 for k in block_keys:
@@ -133,7 +138,28 @@ def build_weather(df: pd.DataFrame, cache_path: Path, batch_size: int = 50, paus
             cache_path.parent.mkdir(parents=True, exist_ok=True)
             pd.DataFrame(cache.values()).to_csv(cache_path, index=False)
             time.sleep(pause)
-        print(f"Weather block {block_no}/{len(groups)} complete; cache={len(cache):,}")
+        print(f"Weather block {block_no}/{total} complete; cache={len(cache):,}; failed_batches={len(failed_batches):,}", flush=True)
+
+    # Retry failed batches once with the smaller batch size already in use.
+    # Remaining failures are logged instead of blocking completion.
+    if failed_batches:
+        print(f"Retrying {len(failed_batches):,} failed weather batches once...", flush=True)
+        for week_key, batch in failed_batches:
+            start = pd.Timestamp(week_key) - pd.Timedelta(days=7)
+            end = pd.Timestamp(week_key) + pd.Timedelta(days=6)
+            payloads = request_weather(batch, start, end)
+            if not payloads:
+                continue
+            for (lat, lon), payload in zip(batch, payloads):
+                hourly = payload.get("hourly", {}) if isinstance(payload, dict) else {}
+                for k in keys:
+                    if k[:2] != (lat, lon) or k[2] < start.strftime("%Y-%m-%d") or k[2] > end.strftime("%Y-%m-%d"):
+                        continue
+                    target = pd.Timestamp(k[2]) + pd.Timedelta(hours=k[3])
+                    vals = feature_at(hourly, target)
+                    if vals is not None:
+                        cache[k] = {"grid_lat": lat, "grid_lon": lon, "acq_date": k[2], "hour": k[3], **vals}
+            pd.DataFrame(cache.values()).to_csv(cache_path, index=False)
 
     rows = []
     for _, r in df.iterrows():
