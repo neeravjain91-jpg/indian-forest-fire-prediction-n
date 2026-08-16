@@ -1,0 +1,84 @@
+{
+  "dataset": {
+    "rows": 131000,
+    "columns": 38,
+    "date_min": "2018-01-01",
+    "date_max": "2025-12-31",
+    "fire_rows": 65518,
+    "nonfire_rows": 65482
+  },
+  "features": [
+    "grid_lat",
+    "grid_lon",
+    "hour",
+    "year",
+    "month",
+    "temp_1d",
+    "rh_1d",
+    "wind_1d",
+    "pressure_1d",
+    "soil_1d",
+    "rain_1d",
+    "temp_3d_mean",
+    "temp_3d_max",
+    "temp_3d_min",
+    "rh_3d_mean",
+    "rh_3d_min",
+    "wind_3d_mean",
+    "wind_3d_max",
+    "pressure_3d_mean",
+    "soil_3d_mean",
+    "rain_3d_total",
+    "temp_7d_mean",
+    "temp_7d_max",
+    "temp_7d_min",
+    "rh_7d_mean",
+    "rh_7d_min",
+    "wind_7d_mean",
+    "wind_7d_max",
+    "pressure_7d_mean",
+    "soil_7d_mean",
+    "rain_7d_total"
+  ],
+  "model": {
+    "max_iter": 300,
+    "learning_rate": 0.05,
+    "max_leaf_nodes": 31,
+    "l2_regularization": 1.0,
+    "random_state": 42
+  },
+  "split": {
+    "train_years": "2018-2022",
+    "validation_year": 2023,
+    "test_years": "2024-2025",
+    "train_rows": 84661,
+    "validation_rows": 14814,
+    "test_rows": 31525
+  },
+  "validation": {
+    "accuracy": 0.7033886863777508,
+    "precision": 0.6883685989733317,
+    "recall": 0.7426718897744158,
+    "f1": 0.7144899285250162,
+    "roc_auc": 0.7880078594139035,
+    "pr_auc": 0.7828095684214122
+  },
+  "test": {
+    "accuracy": 0.700111022997621,
+    "precision": 0.6846541027742011,
+    "recall": 0.7420705404719614,
+    "f1": 0.7122070015220701,
+    "roc_auc": 0.7851741788873351,
+    "pr_auc": 0.7832016459402857
+  },
+  "test_confusion_matrix": [
+    [
+      10373,
+      5388
+    ],
+    [
+      4066,
+      11698
+    ]
+  ]
+}

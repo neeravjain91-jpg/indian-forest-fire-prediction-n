@@ -1,21 +1,14 @@
 __pycache__/
 *.py[cod]
+
 .venv/
 venv/
 .env
 .DS_Store
 .ipynb_checkpoints/
 
-# Raw / generated data
-/data/raw/*
-/data/processed/*
-/cache/*
-/results/*
-/models/*
-*.joblib
+# Cache / temporary files
+/cache/
+
+# Python temporary/model files
 *.pkl
-*.csv
-*.parquet
-!data/raw/.gitkeep
-!data/processed/.gitkeep
-!results/.gitkeep
