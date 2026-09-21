@@ -30,6 +30,29 @@ The verified test results are:
 - ROC-AUC: **78.52%**
 - PR-AUC: **78.32%**
 
+### Application Capabilities
+
+The application provides two clearly separated features:
+
+1. **Live Fire Detection & Active Alerting**: Real-time satellite observations from NASA FIRMS Area API (VIIRS NRT products: `VIIRS_SNPP_NRT`, `VIIRS_NOAA20_NRT`, `VIIRS_NOAA21_NRT`), strictly filtered to sovereign India using `data/processed/india_boundary.geojson`.
+2. **Model-Based Fire Risk Classification**: Interactive inference using the frozen 31-feature `HistGradientBoostingClassifier` trained on the multi-year research dataset.
+
+### Configure NASA FIRMS API Key (Optional for Live Feeds)
+
+To stream live near-real-time observations, obtain a free MAP_KEY from [NASA FIRMS](https://firms.modaps.eosdis.nasa.gov/api/map_key) and export it:
+
+On Windows PowerShell:
+```powershell
+$env:FIRMS_MAP_KEY="your_nasa_firms_map_key"
+```
+
+On Linux / macOS:
+```bash
+export FIRMS_MAP_KEY="your_nasa_firms_map_key"
+```
+
+*Note: If no key is set, the application operates in demo mode using calibrated simulated observations across Indian forest corridors.*
+
 ### Run the web application
 
 The application loads the trained model from:
