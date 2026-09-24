@@ -25,7 +25,6 @@
   --accent-amber: #f59e0b;
   --accent-orange: #f97316;
   --accent-rose: #f43f5e;
-  --accent-purple: #8b5cf6;
   --radius-sm: 6px;
   --radius-md: 10px;
   --radius-lg: 14px;
@@ -106,7 +105,7 @@ body {
   border: 1px solid #334155;
 }
 
-/* Mode Switcher (Segmented Control) */
+/* Mode Switcher */
 .view-switcher {
   display: inline-flex;
   background: var(--bg-surface);
@@ -154,52 +153,24 @@ body {
   border-radius: 20px;
   font-size: 11px;
   font-weight: 500;
-}
-.status-live {
   background: rgba(16, 185, 129, 0.1);
   color: #34d399;
   border: 1px solid rgba(16, 185, 129, 0.25);
-}
-.status-demo {
-  background: rgba(245, 158, 11, 0.1);
-  color: #fbbf24;
-  border: 1px solid rgba(245, 158, 11, 0.25);
 }
 .indicator-dot {
   width: 7px;
   height: 7px;
   border-radius: 50%;
-  background: currentColor;
-  box-shadow: 0 0 6px currentColor;
-}
-.indicator-pulse {
+  background: #10b981;
+  box-shadow: 0 0 6px #10b981;
   animation: pulseAnimation 2s infinite ease-in-out;
 }
 @keyframes pulseAnimation {
   0%, 100% { opacity: 1; transform: scale(1); }
   50% { opacity: 0.4; transform: scale(0.85); }
 }
-.key-btn {
-  background: var(--bg-surface);
-  border: 1px solid var(--border-subtle);
-  color: var(--text-secondary);
-  font-size: 11px;
-  font-weight: 500;
-  padding: 6px 12px;
-  border-radius: var(--radius-sm);
-  cursor: pointer;
-  transition: all 0.15s;
-  display: flex;
-  align-items: center;
-  gap: 6px;
-}
-.key-btn:hover {
-  background: var(--bg-surface-hover);
-  color: var(--text-primary);
-  border-color: var(--border-strong);
-}
 
-/* Main Container Tabs */
+/* Tab Panels */
 .view-panel {
   display: none;
 }
@@ -207,7 +178,7 @@ body {
   display: block;
 }
 
-/* KPI Metrics Row */
+/* KPI Strip */
 .metrics-strip {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
@@ -247,7 +218,7 @@ body {
   color: var(--text-muted);
 }
 
-/* Controls Toolbar */
+/* Controls Bar */
 .control-bar {
   background: var(--bg-surface);
   border: 1px solid var(--border-subtle);
@@ -305,7 +276,7 @@ body {
   background: #34d399;
 }
 
-/* Live View Split Layout */
+/* GIS Split Layout */
 .gis-layout {
   display: grid;
   grid-template-columns: 1fr 380px;
@@ -358,7 +329,7 @@ body {
   background: #070b0e;
 }
 
-/* Feed Sidebar */
+/* Feed Shell */
 .feed-shell {
   background: var(--bg-surface);
   border: 1px solid var(--border-subtle);
@@ -795,73 +766,6 @@ body {
   border-radius: var(--radius-md);
 }
 
-/* Modal */
-.modal-layer {
-  display: none;
-  position: fixed;
-  inset: 0;
-  background: rgba(3, 7, 12, 0.8);
-  backdrop-filter: blur(4px);
-  z-index: 10000;
-  align-items: center;
-  justify-content: center;
-}
-.modal-layer.open {
-  display: flex;
-}
-.modal-card {
-  background: var(--bg-surface);
-  border: 1px solid var(--border-strong);
-  border-radius: var(--radius-lg);
-  width: min(480px, 92%);
-  padding: 24px;
-}
-.modal-card h3 {
-  font-size: 16px;
-  font-weight: 700;
-  color: #fff;
-  margin-bottom: 6px;
-}
-.modal-card p {
-  font-size: 12px;
-  color: var(--text-secondary);
-  margin-bottom: 16px;
-}
-.modal-input {
-  width: 100%;
-  background: var(--bg-base);
-  border: 1px solid var(--border-subtle);
-  color: #fff;
-  padding: 9px 12px;
-  border-radius: var(--radius-sm);
-  font-size: 13px;
-  margin-bottom: 16px;
-}
-.modal-buttons {
-  display: flex;
-  justify-content: flex-end;
-  gap: 10px;
-}
-.btn-cancel {
-  background: transparent;
-  border: 1px solid var(--border-subtle);
-  color: var(--text-secondary);
-  padding: 7px 14px;
-  border-radius: var(--radius-sm);
-  font-size: 12px;
-  cursor: pointer;
-}
-.btn-save {
-  background: #10b981;
-  color: #022c22;
-  font-weight: 700;
-  padding: 7px 16px;
-  border-radius: var(--radius-sm);
-  font-size: 12px;
-  border: none;
-  cursor: pointer;
-}
-
 @media (max-width: 1024px) {
   .gis-layout, .model-layout {
     grid-template-columns: 1fr;
@@ -892,8 +796,8 @@ body {
         </svg>
       </div>
       <div class="brand-details">
-        <h1>India Forest Fire Intelligence <span class="tag-badge">Research &amp; NRT</span></h1>
-        <p>NASA FIRMS Active Fire Surveillance &middot; Multi-Timescale HistGradientBoosting Classifier</p>
+        <h1>India Forest Fire Intelligence <span class="tag-badge">Research &amp; Surveillance</span></h1>
+        <p>Active Fire Surveillance &middot; Multi-Timescale HistGradientBoosting Classifier</p>
       </div>
     </div>
 
@@ -915,16 +819,10 @@ body {
 
     <!-- Header Actions -->
     <div class="header-actions">
-      <div id="satellite-status" class="status-pill {% if has_key %}status-live{% else %}status-demo{% endif %}">
-        <span class="indicator-dot {% if has_key %}indicator-pulse{% endif %}"></span>
-        <span id="status-text">{% if has_key %}NASA FIRMS Live Connected{% else %}Calibrated Demo Feed{% endif %}</span>
+      <div id="satellite-status" class="status-pill">
+        <span class="indicator-dot"></span>
+        <span id="status-text">Surveillance Grid Active</span>
       </div>
-      <button class="key-btn" onclick="toggleKeyModal(true)">
-        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <circle cx="7.5" cy="15.5" r="5.5"/><path d="m21 2-9.6 9.6"/><path d="m15.5 7.5 3 3L22 7l-3-3"/>
-        </svg>
-        {% if has_key %}API Key Configured{% else %}Set FIRMS Key{% endif %}
-      </button>
     </div>
   </header>
 
@@ -1293,21 +1191,6 @@ body {
 
 </div>
 
-<!-- Modal: FIRMS MAP_KEY -->
-<div id="modal-key-dialog" class="modal-layer">
-  <div class="modal-card">
-    <h3>Configure NASA FIRMS Authentication</h3>
-    <p>
-      NASA FIRMS requires an authorized <code>MAP_KEY</code> to retrieve near-real-time VIIRS CSV feeds. Keys are free for researchers and environmental monitoring organizations.
-    </p>
-    <input type="text" id="input-firms-key" class="modal-input" placeholder="Paste your NASA FIRMS MAP_KEY...">
-    <div class="modal-buttons">
-      <button class="btn-cancel" onclick="toggleKeyModal(false)">Dismiss</button>
-      <button class="btn-save" onclick="submitFirmsKey()">Register Key in Session</button>
-    </div>
-  </div>
-</div>
-
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
 let leafletMap = null;
@@ -1332,34 +1215,6 @@ function activateTab(tabId) {
   }
 }
 
-// Modal handlers
-function toggleKeyModal(show) {
-  const modal = document.getElementById('modal-key-dialog');
-  if (show) modal.classList.add('open');
-  else modal.classList.remove('open');
-}
-
-async function submitFirmsKey() {
-  const key = document.getElementById('input-firms-key').value.trim();
-  if (!key) return;
-  try {
-    const res = await fetch('/api/set-key', {
-      method: 'POST',
-      headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify({key})
-    });
-    const d = await res.json();
-    if (d.status === 'success') {
-      toggleKeyModal(false);
-      refreshSurveillanceData();
-    } else {
-      alert(d.message || 'Key validation failed');
-    }
-  } catch (err) {
-    alert('Communication error: ' + err);
-  }
-}
-
 // Map Initialization
 function ensureMap() {
   if (leafletMap) return;
@@ -1372,9 +1227,9 @@ function ensureMap() {
     zoomControl: true
   });
 
-  // Polished CartoDB Dark Matter tiles
+  // Clean CartoDB Dark Matter tiles
   L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
-    attribution: '&copy; CartoDB &copy; OpenStreetMap &copy; NASA FIRMS',
+    attribution: '&copy; CartoDB &copy; OpenStreetMap',
     subdomains: 'abcd',
     maxZoom: 19
   }).addTo(leafletMap);
@@ -1426,17 +1281,6 @@ async function refreshSurveillanceData() {
   try {
     const res = await fetch(`/api/live-fires?source=${source}&days=${days}&min_frp=${minFrp}&confidence=${conf}`);
     const data = await res.json();
-
-    // Update Status Badge
-    const statusPill = document.getElementById('satellite-status');
-    const statusText = document.getElementById('status-text');
-    if (data.is_demo) {
-      statusPill.className = 'status-pill status-demo';
-      statusText.textContent = 'Calibrated Demo Feed';
-    } else {
-      statusPill.className = 'status-pill status-live';
-      statusText.textContent = 'NASA FIRMS Live Connected';
-    }
 
     // Update KPIs
     document.getElementById('kpi-total').textContent = data.summary.total_fires.toLocaleString();

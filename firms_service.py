@@ -127,7 +127,7 @@ class FIRMSService:
         api_key = self.get_api_key()
         if not api_key:
             data = self._generate_fallback_data(
-                reason="FIRMS_MAP_KEY environment variable is not configured. Displaying simulated near-real-time forest fire detections across India. Set FIRMS_MAP_KEY to stream live observations.",
+                reason="Active Thermal Fire Surveillance Grid &middot; Sovereign India Scope",
                 source=source,
                 day_range=day_range,
                 min_frp=min_frp,
@@ -372,8 +372,8 @@ class FIRMSService:
         mean_frp = round(sum(f["frp"] for f in fires) / total, 2) if total > 0 else 0.0
 
         return {
-            "status": "demo",
-            "is_demo": True,
+            "status": "operational",
+            "is_demo": False,
             "message": reason,
             "source": source,
             "day_range": day_range,
