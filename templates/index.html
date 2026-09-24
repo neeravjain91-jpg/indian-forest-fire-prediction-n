@@ -3,991 +3,1344 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>FireWatch India — Live Alerts & Research Classifier</title>
+<title>India Forest Fire Intelligence System | FIRMS NRT & ML Risk Classifier</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
 <style>
 :root {
-  --bg-main: #060e09;
-  --bg-card: #0d1912;
-  --bg-card-hover: #122219;
-  --bg-input: #07130b;
-  --border-subtle: #1c3022;
-  --border-focus: #22c55e;
-  --text-primary: #f2f7f3;
-  --text-muted: #8b9c91;
-  --accent-green: #22c55e;
-  --accent-green-dark: #15803d;
-  --accent-yellow: #eab308;
+  --bg-base: #080c10;
+  --bg-surface: #0e141c;
+  --bg-surface-elevated: #151e2a;
+  --bg-surface-hover: #1c2838;
+  --border-subtle: #1e293b;
+  --border-strong: #2e3e55;
+  --border-focus: #10b981;
+  --text-primary: #f8fafc;
+  --text-secondary: #94a3b8;
+  --text-muted: #64748b;
+  --accent-emerald: #10b981;
+  --accent-emerald-dark: #065f46;
+  --accent-amber: #f59e0b;
   --accent-orange: #f97316;
-  --accent-red: #ef4444;
-  --accent-purple: #a855f7;
+  --accent-rose: #f43f5e;
+  --accent-purple: #8b5cf6;
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 14px;
 }
+
 * { box-sizing: border-box; margin: 0; padding: 0; }
 body {
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
-  background: var(--bg-main);
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  background-color: var(--bg-base);
   color: var(--text-primary);
   line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
   min-height: 100vh;
 }
-.container {
-  width: min(1380px, 95%);
+.mono {
+  font-family: 'JetBrains Mono', monospace;
+}
+
+/* Layout */
+.app-container {
+  max-width: 1440px;
   margin: 0 auto;
-  padding: 24px 0 48px;
+  padding: 16px 24px 48px;
 }
-/* Navigation & Header */
-.nav {
+
+/* Header & Top Bar */
+.top-header {
   display: flex;
+  align-items: center;
   justify-content: space-between;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 16px;
-  padding-bottom: 20px;
+  padding-bottom: 16px;
   border-bottom: 1px solid var(--border-subtle);
-  margin-bottom: 24px;
+  margin-bottom: 20px;
+  gap: 16px;
+  flex-wrap: wrap;
 }
-.brand-group {
+.brand-section {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 14px;
 }
-.brand-logo {
-  font-size: 26px;
+.brand-mark {
+  width: 40px;
+  height: 40px;
+  border-radius: var(--radius-md);
+  background: linear-gradient(135deg, #064e3b, #0f766e);
+  border: 1px solid #10b98144;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #34d399;
+  font-size: 20px;
+  box-shadow: 0 4px 12px rgba(6, 78, 59, 0.3);
 }
-.brand-title {
-  font-size: 22px;
-  font-weight: 800;
-  letter-spacing: -0.5px;
+.brand-details h1 {
+  font-size: 17px;
+  font-weight: 700;
+  letter-spacing: -0.3px;
   color: #fff;
-}
-.brand-sub {
-  font-size: 11px;
-  color: var(--text-muted);
-  text-transform: uppercase;
-  letter-spacing: 1px;
-}
-/* Tab Switcher */
-.tabs {
-  display: inline-flex;
-  background: #08140c;
-  border: 1px solid var(--border-subtle);
-  border-radius: 12px;
-  padding: 4px;
-}
-.tab-btn {
-  background: transparent;
-  border: 0;
-  color: var(--text-muted);
-  padding: 10px 20px;
-  font-size: 13px;
-  font-weight: 600;
-  border-radius: 8px;
-  cursor: pointer;
-  transition: all 0.2s ease;
   display: flex;
   align-items: center;
   gap: 8px;
 }
-.tab-btn.active {
-  background: #14281b;
-  color: #4ade80;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+.brand-details p {
+  font-size: 11px;
+  color: var(--text-secondary);
+  letter-spacing: 0.2px;
 }
-.tab-btn:hover:not(.active) {
-  color: #fff;
+.tag-badge {
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+  padding: 2px 7px;
+  border-radius: 4px;
+  background: #1e293b;
+  color: #94a3b8;
+  border: 1px solid #334155;
 }
-.tab-content {
+
+/* Mode Switcher (Segmented Control) */
+.view-switcher {
+  display: inline-flex;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  padding: 3px;
+  gap: 2px;
+}
+.view-btn {
+  background: transparent;
+  border: none;
+  color: var(--text-secondary);
+  font-size: 12px;
+  font-weight: 600;
+  padding: 8px 16px;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: all 0.15s ease;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.view-btn:hover:not(.active) {
+  color: var(--text-primary);
+  background: rgba(255, 255, 255, 0.03);
+}
+.view-btn.active {
+  background: var(--bg-surface-elevated);
+  color: #34d399;
+  border: 1px solid #10b98133;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
+}
+
+/* Header Utilities */
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.status-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 5px 12px;
+  border-radius: 20px;
+  font-size: 11px;
+  font-weight: 500;
+}
+.status-live {
+  background: rgba(16, 185, 129, 0.1);
+  color: #34d399;
+  border: 1px solid rgba(16, 185, 129, 0.25);
+}
+.status-demo {
+  background: rgba(245, 158, 11, 0.1);
+  color: #fbbf24;
+  border: 1px solid rgba(245, 158, 11, 0.25);
+}
+.indicator-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: currentColor;
+  box-shadow: 0 0 6px currentColor;
+}
+.indicator-pulse {
+  animation: pulseAnimation 2s infinite ease-in-out;
+}
+@keyframes pulseAnimation {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.4; transform: scale(0.85); }
+}
+.key-btn {
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  color: var(--text-secondary);
+  font-size: 11px;
+  font-weight: 500;
+  padding: 6px 12px;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: all 0.15s;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.key-btn:hover {
+  background: var(--bg-surface-hover);
+  color: var(--text-primary);
+  border-color: var(--border-strong);
+}
+
+/* Main Container Tabs */
+.view-panel {
   display: none;
 }
-.tab-content.active {
+.view-panel.active {
   display: block;
 }
 
-/* Banner */
-.status-banner {
-  border-radius: 12px;
-  padding: 12px 18px;
-  margin-bottom: 24px;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  flex-wrap: wrap;
-  gap: 12px;
-  font-size: 13px;
-}
-.banner-live {
-  background: rgba(34, 197, 94, 0.1);
-  border: 1px solid rgba(34, 197, 94, 0.3);
-  color: #86efac;
-}
-.banner-demo {
-  background: rgba(234, 179, 8, 0.1);
-  border: 1px solid rgba(234, 179, 8, 0.3);
-  color: #fde047;
-}
-.banner-content {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
-.pulse-dot {
-  width: 9px;
-  height: 9px;
-  border-radius: 50%;
-  background: #22c55e;
-  box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.7);
-  animation: pulse 2s infinite;
-}
-.pulse-dot.amber {
-  background: #eab308;
-  box-shadow: 0 0 0 0 rgba(234, 179, 8, 0.7);
-}
-@keyframes pulse {
-  0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.7); }
-  70% { transform: scale(1); box-shadow: 0 0 0 8px rgba(34, 197, 94, 0); }
-  100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(34, 197, 94, 0); }
-}
-.banner-btn {
-  background: #193121;
-  border: 1px solid #2e4a36;
-  color: #fff;
-  font-size: 12px;
-  font-weight: 600;
-  padding: 6px 14px;
-  border-radius: 6px;
-  cursor: pointer;
-}
-.banner-btn:hover {
-  background: #23422e;
-}
-
-/* KPI Cards */
-.kpi-grid {
+/* KPI Metrics Row */
+.metrics-strip {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-  gap: 16px;
-  margin-bottom: 24px;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+  margin-bottom: 16px;
 }
-.kpi-card {
-  background: var(--bg-card);
+.metric-tile {
+  background: var(--bg-surface);
   border: 1px solid var(--border-subtle);
-  border-radius: 14px;
-  padding: 18px 20px;
+  border-radius: var(--radius-md);
+  padding: 14px 18px;
   display: flex;
   flex-direction: column;
   justify-content: space-between;
 }
-.kpi-label {
+.metric-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.metric-title {
   font-size: 11px;
   font-weight: 600;
   text-transform: uppercase;
-  letter-spacing: 1px;
-  color: var(--text-muted);
+  letter-spacing: 0.6px;
+  color: var(--text-secondary);
 }
-.kpi-value {
-  font-size: 34px;
-  font-weight: 800;
-  margin: 6px 0 2px;
+.metric-value {
+  font-size: 26px;
+  font-weight: 700;
+  letter-spacing: -0.5px;
   color: #fff;
+  margin: 6px 0 2px;
 }
-.kpi-desc {
-  font-size: 12px;
+.metric-sub {
+  font-size: 11px;
   color: var(--text-muted);
 }
 
-/* Filters Bar */
-.filter-bar {
-  background: var(--bg-card);
+/* Controls Toolbar */
+.control-bar {
+  background: var(--bg-surface);
   border: 1px solid var(--border-subtle);
-  border-radius: 14px;
-  padding: 16px 20px;
-  margin-bottom: 20px;
+  border-radius: var(--radius-md);
+  padding: 10px 16px;
+  margin-bottom: 16px;
   display: flex;
-  flex-wrap: wrap;
   align-items: center;
-  gap: 16px;
+  flex-wrap: wrap;
+  gap: 14px;
 }
-.filter-item {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-.filter-item label {
-  font-size: 11px;
-  font-weight: 600;
-  text-transform: uppercase;
-  color: var(--text-muted);
-  letter-spacing: 0.5px;
-}
-.filter-item select {
-  background: var(--bg-input);
-  border: 1px solid var(--border-subtle);
-  color: #fff;
-  padding: 8px 12px;
-  border-radius: 8px;
-  font-size: 13px;
-  cursor: pointer;
-}
-.filter-item select:focus {
-  outline: none;
-  border-color: var(--border-focus);
-}
-.refresh-btn {
-  margin-left: auto;
-  align-self: flex-end;
-  background: var(--accent-green);
-  color: #031509;
-  font-weight: 700;
-  border: none;
-  padding: 10px 20px;
-  border-radius: 8px;
-  cursor: pointer;
+.control-group {
   display: flex;
   align-items: center;
   gap: 8px;
-  font-size: 13px;
-  transition: opacity 0.2s;
 }
-.refresh-btn:hover {
-  opacity: 0.9;
+.control-group label {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  white-space: nowrap;
+}
+.control-select {
+  background: var(--bg-surface-elevated);
+  border: 1px solid var(--border-subtle);
+  color: var(--text-primary);
+  font-size: 12px;
+  padding: 6px 10px;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: border-color 0.15s;
+}
+.control-select:focus {
+  outline: none;
+  border-color: var(--border-focus);
+}
+.btn-refresh {
+  margin-left: auto;
+  background: #10b981;
+  color: #022c22;
+  font-size: 12px;
+  font-weight: 700;
+  border: none;
+  padding: 8px 16px;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  transition: all 0.15s;
+}
+.btn-refresh:hover {
+  background: #34d399;
 }
 
-/* Main Live View Grid */
-.live-grid {
+/* Live View Split Layout */
+.gis-layout {
   display: grid;
-  grid-template-columns: 1.6fr 1fr;
-  gap: 20px;
+  grid-template-columns: 1fr 380px;
+  gap: 16px;
+  height: 680px;
 }
-.map-container {
-  background: var(--bg-card);
+
+/* Map Shell */
+.map-shell {
+  background: var(--bg-surface);
   border: 1px solid var(--border-subtle);
-  border-radius: 16px;
+  border-radius: var(--radius-lg);
   overflow: hidden;
   position: relative;
   display: flex;
   flex-direction: column;
 }
-.map-header {
-  padding: 14px 20px;
+.map-topbar {
+  padding: 10px 16px;
   border-bottom: 1px solid var(--border-subtle);
   display: flex;
-  justify-content: space-between;
   align-items: center;
+  justify-content: space-between;
+  background: var(--bg-surface);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-secondary);
 }
-.map-title {
-  font-size: 14px;
-  font-weight: 700;
-  color: #fff;
-}
-.map-legend {
+.map-legend-pills {
   display: flex;
   align-items: center;
-  gap: 12px;
-  font-size: 11px;
+  gap: 10px;
+  font-size: 10px;
+  font-weight: 500;
   color: var(--text-muted);
 }
-.legend-item {
+.legend-pill {
   display: flex;
   align-items: center;
   gap: 4px;
 }
 .legend-dot {
-  width: 9px;
-  height: 9px;
+  width: 7px;
+  height: 7px;
   border-radius: 50%;
 }
 #india-map {
+  flex: 1;
   width: 100%;
-  height: 600px;
-  background: #09120c;
+  background: #070b0e;
 }
 
-/* Alert Feed */
-.feed-container {
-  background: var(--bg-card);
+/* Feed Sidebar */
+.feed-shell {
+  background: var(--bg-surface);
   border: 1px solid var(--border-subtle);
-  border-radius: 16px;
-  overflow: hidden;
+  border-radius: var(--radius-lg);
   display: flex;
   flex-direction: column;
-  height: 660px;
+  overflow: hidden;
 }
-.feed-header {
-  padding: 16px 20px;
+.feed-topbar {
+  padding: 12px 16px;
   border-bottom: 1px solid var(--border-subtle);
   display: flex;
-  justify-content: space-between;
   align-items: center;
+  justify-content: space-between;
 }
-.feed-title {
-  font-size: 14px;
+.feed-heading {
+  font-size: 13px;
   font-weight: 700;
   color: #fff;
-}
-.feed-list {
-  flex: 1;
-  overflow-y: auto;
-  padding: 12px;
   display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
-.feed-card {
-  background: #09140d;
-  border: 1px solid #192b1f;
-  border-radius: 10px;
-  padding: 12px 14px;
-  transition: all 0.2s;
-  cursor: pointer;
-}
-.feed-card:hover {
-  background: #112417;
-  border-color: #274530;
-}
-.feed-top {
-  display: flex;
-  justify-content: space-between;
   align-items: center;
-  margin-bottom: 6px;
-}
-.feed-frp {
-  font-size: 16px;
-  font-weight: 800;
+  gap: 8px;
 }
 .feed-badge {
   font-size: 10px;
+  font-weight: 600;
+  color: var(--text-muted);
+  background: var(--bg-surface-elevated);
+  padding: 2px 7px;
+  border-radius: 4px;
+}
+.feed-scroll {
+  flex: 1;
+  overflow-y: auto;
+  padding: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.incident-item {
+  background: var(--bg-surface-elevated);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  padding: 10px 12px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+.incident-item:hover {
+  background: var(--bg-surface-hover);
+  border-color: var(--border-strong);
+  transform: translateY(-1px);
+}
+.incident-row-1 {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 4px;
+}
+.incident-frp {
+  font-size: 14px;
   font-weight: 700;
-  padding: 3px 8px;
-  border-radius: 12px;
+  letter-spacing: -0.3px;
+}
+.severity-tag {
+  font-size: 9px;
+  font-weight: 700;
   text-transform: uppercase;
+  letter-spacing: 0.5px;
+  padding: 2px 6px;
+  border-radius: 4px;
 }
-.badge-severe { background: rgba(239, 68, 68, 0.2); color: #fca5a5; border: 1px solid #ef4444; }
-.badge-high { background: rgba(249, 115, 22, 0.2); color: #fdba74; border: 1px solid #f97316; }
-.badge-moderate { background: rgba(234, 179, 8, 0.2); color: #fde047; border: 1px solid #eab308; }
-.badge-low { background: rgba(34, 197, 94, 0.2); color: #86efac; border: 1px solid #22c55e; }
+.tag-severe { background: rgba(244, 63, 94, 0.15); color: #fb7185; border: 1px solid #f43f5e44; }
+.tag-high { background: rgba(249, 115, 22, 0.15); color: #fb923c; border: 1px solid #f9731644; }
+.tag-moderate { background: rgba(245, 158, 11, 0.15); color: #fbbf24; border: 1px solid #f59e0b44; }
+.tag-low { background: rgba(16, 185, 129, 0.15); color: #34d399; border: 1px solid #10b98144; }
 
-.feed-coords {
-  font-size: 12px;
-  color: #c9d6ce;
-  font-family: monospace;
+.incident-coords {
+  font-size: 11px;
+  color: var(--text-secondary);
 }
-.feed-meta {
+.incident-footer {
   display: flex;
   justify-content: space-between;
-  font-size: 11px;
-  color: var(--text-muted);
+  align-items: center;
   margin-top: 6px;
   padding-top: 6px;
-  border-top: 1px solid #132217;
+  border-top: 1px solid #1a2433;
+  font-size: 10px;
+  color: var(--text-muted);
 }
 
-/* Tab 2: Model View Styles */
-.model-grid {
+/* Custom Leaflet Popup */
+.leaflet-popup-content-wrapper {
+  background: #0e1622 !important;
+  color: var(--text-primary) !important;
+  border: 1px solid var(--border-strong) !important;
+  border-radius: var(--radius-md) !important;
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.5) !important;
+  padding: 0 !important;
+}
+.leaflet-popup-content {
+  margin: 12px 14px !important;
+  font-family: 'Inter', sans-serif !important;
+}
+.leaflet-popup-tip {
+  background: #0e1622 !important;
+  border: 1px solid var(--border-strong) !important;
+}
+.popup-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1px solid var(--border-subtle);
+  padding-bottom: 6px;
+  margin-bottom: 8px;
+}
+.popup-frp {
+  font-size: 15px;
+  font-weight: 800;
+}
+.popup-table {
+  width: 100%;
+  font-size: 11px;
+  border-collapse: collapse;
+}
+.popup-table td {
+  padding: 3px 0;
+}
+.popup-table td:first-child {
+  color: var(--text-muted);
+  width: 45%;
+}
+.popup-btn {
+  margin-top: 10px;
+  width: 100%;
+  padding: 7px;
+  background: #10b981;
+  color: #022c22;
+  border: none;
+  border-radius: var(--radius-sm);
+  font-size: 11px;
+  font-weight: 700;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+}
+
+/* ------------------------------------------- */
+/* TAB 2: RESEARCH CLASSIFIER VIEW STYLING     */
+/* ------------------------------------------- */
+.model-layout {
   display: grid;
-  grid-template-columns: 1.3fr 0.7fr;
-  gap: 24px;
+  grid-template-columns: 1fr 380px;
+  gap: 20px;
+  align-items: start;
 }
 .model-card {
-  background: var(--bg-card);
+  background: var(--bg-surface);
   border: 1px solid var(--border-subtle);
-  border-radius: 16px;
+  border-radius: var(--radius-lg);
   padding: 24px;
 }
-.section-title {
-  font-size: 18px;
-  font-weight: 800;
-  margin-bottom: 6px;
-  color: #fff;
-}
-.section-desc {
-  font-size: 12px;
-  color: var(--text-muted);
+.card-title-group {
   margin-bottom: 18px;
 }
-.preset-bar {
+.card-title-group h2 {
+  font-size: 17px;
+  font-weight: 700;
+  color: #fff;
+  letter-spacing: -0.3px;
+}
+.card-title-group p {
+  font-size: 12px;
+  color: var(--text-secondary);
+  margin-top: 3px;
+}
+
+/* Presets Strip */
+.preset-strip {
   display: flex;
+  align-items: center;
   flex-wrap: wrap;
   gap: 8px;
+  padding: 10px 14px;
+  background: var(--bg-surface-elevated);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
   margin-bottom: 20px;
-  padding-bottom: 16px;
-  border-bottom: 1px solid var(--border-subtle);
 }
-.preset-btn {
-  background: #112217;
-  border: 1px solid #233c29;
-  color: #c0cfc5;
+.preset-label {
   font-size: 11px;
   font-weight: 600;
-  padding: 6px 12px;
-  border-radius: 6px;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  letter-spacing: 0.5px;
+  margin-right: 4px;
+}
+.preset-pill {
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  color: var(--text-secondary);
+  font-size: 11px;
+  font-weight: 500;
+  padding: 5px 12px;
+  border-radius: 20px;
   cursor: pointer;
   transition: all 0.15s;
 }
-.preset-btn:hover {
-  background: #183322;
-  color: #4ade80;
-  border-color: #22c55e;
+.preset-pill:hover {
+  background: var(--bg-surface-hover);
+  color: var(--accent-emerald);
+  border-color: var(--accent-emerald);
 }
-.field-group {
+
+/* Form Groups */
+.form-section {
   margin-bottom: 20px;
+  background: var(--bg-surface-elevated);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  padding: 16px;
 }
-.group-header {
-  font-size: 12px;
+.section-tag {
+  font-size: 11px;
   font-weight: 700;
   text-transform: uppercase;
-  color: #4ade80;
-  letter-spacing: 0.8px;
-  margin-bottom: 10px;
+  letter-spacing: 0.6px;
+  color: #34d399;
+  margin-bottom: 12px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
 }
-.fields-grid {
+.inputs-grid-5 {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(170px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
   gap: 12px;
 }
-.field-box {
+.inputs-grid-6 {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 12px;
+}
+.input-field {
   display: flex;
   flex-direction: column;
   gap: 4px;
 }
-.field-box label {
+.input-field label {
   font-size: 11px;
-  color: var(--text-muted);
+  font-weight: 500;
+  color: var(--text-secondary);
+  display: flex;
+  justify-content: space-between;
 }
-.field-box input {
-  background: var(--bg-input);
+.input-field input {
+  background: var(--bg-base);
   border: 1px solid var(--border-subtle);
-  border-radius: 8px;
-  padding: 8px 10px;
   color: #fff;
   font-size: 13px;
+  padding: 7px 10px;
+  border-radius: var(--radius-sm);
+  transition: border-color 0.15s;
 }
-.field-box input:focus {
+.input-field input:focus {
   outline: none;
   border-color: var(--border-focus);
 }
-.submit-btn {
-  width: 100%;
-  background: var(--accent-green);
-  color: #04180b;
-  font-weight: 800;
-  font-size: 14px;
-  letter-spacing: 0.5px;
-  padding: 14px;
-  border: 0;
-  border-radius: 10px;
-  cursor: pointer;
-  margin-top: 10px;
-  transition: opacity 0.2s;
-}
-.submit-btn:hover {
-  opacity: 0.9;
-}
 
-/* Prediction Result Panel */
-.result-card {
-  display: flex;
-  flex-direction: column;
-  justify-content: space-between;
+/* Comparative Multi-Timescale Matrix */
+.matrix-container {
+  overflow-x: auto;
 }
-.result-score {
-  font-size: 56px;
-  font-weight: 900;
-  color: #fff;
-  line-height: 1;
-  margin: 16px 0 10px;
+.weather-matrix {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 11px;
 }
-.result-badge {
-  display: inline-block;
-  font-size: 12px;
-  font-weight: 700;
-  padding: 8px 16px;
-  border-radius: 20px;
+.weather-matrix th {
+  text-align: left;
+  padding: 8px 10px;
+  color: var(--text-muted);
+  font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.5px;
+  border-bottom: 1px solid var(--border-subtle);
 }
-.result-badge.danger {
-  background: rgba(239, 68, 68, 0.2);
-  color: #f87171;
-  border: 1px solid #ef4444;
+.weather-matrix td {
+  padding: 6px 10px;
+  border-bottom: 1px solid #182230;
 }
-.result-badge.safe {
-  background: rgba(34, 197, 94, 0.2);
-  color: #4ade80;
-  border: 1px solid #22c55e;
-}
-.metrics-panel {
-  margin-top: 24px;
-  background: #08130c;
+.matrix-input {
+  width: 100%;
+  max-width: 100px;
+  background: var(--bg-base);
   border: 1px solid var(--border-subtle);
-  border-radius: 12px;
-  padding: 16px;
+  color: #fff;
+  font-size: 12px;
+  padding: 5px 8px;
+  border-radius: var(--radius-sm);
 }
-.metrics-panel-title {
+.matrix-input:focus {
+  outline: none;
+  border-color: var(--border-focus);
+}
+
+.btn-classify {
+  width: 100%;
+  background: #10b981;
+  color: #022c22;
+  font-size: 14px;
+  font-weight: 700;
+  padding: 12px;
+  border: none;
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  transition: all 0.15s;
+  letter-spacing: 0.3px;
+}
+.btn-classify:hover {
+  background: #34d399;
+}
+
+/* Prediction Output Card */
+.output-shell {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.prediction-box {
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  padding: 24px;
+  text-align: center;
+}
+.output-eyebrow {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+  color: var(--text-muted);
+}
+.prob-display {
+  font-size: 52px;
+  font-weight: 800;
+  letter-spacing: -1.5px;
+  color: #fff;
+  margin: 10px 0 6px;
+}
+.decision-pill {
+  display: inline-block;
+  padding: 6px 16px;
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.4px;
+  text-transform: uppercase;
+}
+.decision-danger {
+  background: rgba(244, 63, 94, 0.15);
+  color: #fb7185;
+  border: 1px solid #f43f5e55;
+}
+.decision-safe {
+  background: rgba(16, 185, 129, 0.15);
+  color: #34d399;
+  border: 1px solid #10b98155;
+}
+.prob-bar {
+  width: 100%;
+  height: 6px;
+  background: #1a2433;
+  border-radius: 3px;
+  overflow: hidden;
+  margin: 18px 0 10px;
+}
+.prob-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #10b981, #f59e0b, #ef4444);
+  border-radius: 3px;
+  transition: width 0.4s ease;
+}
+
+/* Benchmark Panel */
+.benchmark-box {
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  padding: 20px;
+}
+.benchmark-title {
   font-size: 11px;
   font-weight: 700;
   text-transform: uppercase;
-  letter-spacing: 1px;
+  letter-spacing: 0.6px;
   color: var(--text-muted);
   margin-bottom: 12px;
 }
-.metrics-2x2 {
+.benchmark-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 10px;
 }
-.metric-box {
-  background: #0e1e14;
-  border: 1px solid #1a2f21;
-  border-radius: 8px;
-  padding: 10px;
+.benchmark-tile {
+  background: var(--bg-surface-elevated);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  padding: 10px 12px;
 }
-.metric-box small {
+.benchmark-tile span {
   display: block;
   font-size: 10px;
   color: var(--text-muted);
   text-transform: uppercase;
+  font-weight: 500;
 }
-.metric-box strong {
+.benchmark-tile strong {
   display: block;
   font-size: 16px;
-  color: #4ade80;
+  color: #fff;
   margin-top: 2px;
 }
-.research-note {
-  margin-top: 16px;
+
+.citation-box {
   font-size: 11px;
-  color: #627468;
-  line-height: 1.5;
+  color: var(--text-muted);
+  line-height: 1.6;
+  padding: 12px 14px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
 }
 
-/* Modal for API Key */
-.modal-overlay {
+/* Modal */
+.modal-layer {
   display: none;
   position: fixed;
   inset: 0;
-  background: rgba(0,0,0,0.75);
+  background: rgba(3, 7, 12, 0.8);
   backdrop-filter: blur(4px);
-  z-index: 9999;
+  z-index: 10000;
   align-items: center;
   justify-content: center;
 }
-.modal-overlay.active {
+.modal-layer.open {
   display: flex;
 }
-.modal-box {
-  background: #0d1a12;
-  border: 1px solid #274530;
-  border-radius: 16px;
-  width: min(520px, 92%);
+.modal-card {
+  background: var(--bg-surface);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-lg);
+  width: min(480px, 92%);
   padding: 24px;
 }
-.modal-title {
-  font-size: 18px;
-  font-weight: 800;
-  margin-bottom: 8px;
+.modal-card h3 {
+  font-size: 16px;
+  font-weight: 700;
   color: #fff;
+  margin-bottom: 6px;
 }
-.modal-desc {
-  font-size: 13px;
-  color: var(--text-muted);
-  margin-bottom: 18px;
+.modal-card p {
+  font-size: 12px;
+  color: var(--text-secondary);
+  margin-bottom: 16px;
 }
 .modal-input {
   width: 100%;
-  background: var(--bg-input);
+  background: var(--bg-base);
   border: 1px solid var(--border-subtle);
-  border-radius: 8px;
-  padding: 10px 14px;
   color: #fff;
-  font-size: 14px;
-  margin-bottom: 14px;
+  padding: 9px 12px;
+  border-radius: var(--radius-sm);
+  font-size: 13px;
+  margin-bottom: 16px;
 }
-.modal-actions {
+.modal-buttons {
   display: flex;
   justify-content: flex-end;
   gap: 10px;
 }
-.modal-btn-cancel {
+.btn-cancel {
   background: transparent;
   border: 1px solid var(--border-subtle);
-  color: var(--text-muted);
-  padding: 8px 16px;
-  border-radius: 8px;
+  color: var(--text-secondary);
+  padding: 7px 14px;
+  border-radius: var(--radius-sm);
+  font-size: 12px;
   cursor: pointer;
 }
-.modal-btn-save {
-  background: var(--accent-green);
-  color: #05160b;
+.btn-save {
+  background: #10b981;
+  color: #022c22;
   font-weight: 700;
-  padding: 8px 18px;
-  border-radius: 8px;
+  padding: 7px 16px;
+  border-radius: var(--radius-sm);
+  font-size: 12px;
   border: none;
   cursor: pointer;
 }
 
-@media (max-width: 992px) {
-  .live-grid, .model-grid {
+@media (max-width: 1024px) {
+  .gis-layout, .model-layout {
     grid-template-columns: 1fr;
+    height: auto;
   }
   #india-map {
     height: 480px;
   }
-  .feed-container {
-    height: 480px;
+  .feed-shell {
+    height: 400px;
+  }
+  .metrics-strip {
+    grid-template-columns: repeat(2, 1fr);
   }
 }
 </style>
 </head>
 <body>
-<div class="container">
 
-  <!-- Navigation Bar -->
-  <header class="nav">
-    <div class="brand-group">
-      <div class="brand-logo">🌲</div>
-      <div>
-        <div class="brand-title">FireWatch India</div>
-        <div class="brand-sub">Satellite Active Fire Alert & Research Risk Classifier</div>
+<div class="app-container">
+
+  <!-- Header -->
+  <header class="top-header">
+    <div class="brand-section">
+      <div class="brand-mark">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 0 0 2.5 2.5z"/>
+        </svg>
+      </div>
+      <div class="brand-details">
+        <h1>India Forest Fire Intelligence <span class="tag-badge">Research &amp; NRT</span></h1>
+        <p>NASA FIRMS Active Fire Surveillance &middot; Multi-Timescale HistGradientBoosting Classifier</p>
       </div>
     </div>
-    
-    <div class="tabs">
-      <button class="tab-btn {% if active_tab == 'live' %}active{% endif %}" onclick="switchTab('live')">
-        🛰️ Live Fire Alerts (India)
+
+    <!-- Mode Switcher -->
+    <div class="view-switcher">
+      <button class="view-btn {% if active_tab == 'live' %}active{% endif %}" onclick="activateTab('live')">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="12" cy="12" r="10"/><polygon points="16.24 7.76 14.12 14.12 7.76 16.24 9.88 9.88 16.24 7.76"/>
+        </svg>
+        Active Surveillance (Live FIRMS)
       </button>
-      <button class="tab-btn {% if active_tab == 'model' %}active{% endif %}" onclick="switchTab('model')">
-        🤖 31-Feature Model Predictor
+      <button class="view-btn {% if active_tab == 'model' %}active{% endif %}" onclick="activateTab('model')">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/>
+        </svg>
+        Risk Classifier (31-Feature Model)
+      </button>
+    </div>
+
+    <!-- Header Actions -->
+    <div class="header-actions">
+      <div id="satellite-status" class="status-pill {% if has_key %}status-live{% else %}status-demo{% endif %}">
+        <span class="indicator-dot {% if has_key %}indicator-pulse{% endif %}"></span>
+        <span id="status-text">{% if has_key %}NASA FIRMS Live Connected{% else %}Calibrated Demo Feed{% endif %}</span>
+      </div>
+      <button class="key-btn" onclick="toggleKeyModal(true)">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <circle cx="7.5" cy="15.5" r="5.5"/><path d="m21 2-9.6 9.6"/><path d="m15.5 7.5 3 3L22 7l-3-3"/>
+        </svg>
+        {% if has_key %}API Key Configured{% else %}Set FIRMS Key{% endif %}
       </button>
     </div>
   </header>
 
-  <!-- TAB 1: REAL-TIME NASA FIRMS ALERT SYSTEM -->
-  <main id="tab-live" class="tab-content {% if active_tab == 'live' %}active{% endif %}">
-    
-    <!-- Status Banner -->
-    <div id="status-banner" class="status-banner {% if has_key %}banner-live{% else %}banner-demo{% endif %}">
-      <div class="banner-content">
-        <div class="pulse-dot {% if not has_key %}amber{% endif %}"></div>
-        <span id="banner-text">
-          {% if has_key %}
-            <strong>LIVE SATELLITE FEED ACTIVE:</strong> NASA FIRMS VIIRS near-real-time observations strictly filtered to sovereign India boundary.
-          {% else %}
-            <strong>SIMULATION / DEMO MODE:</strong> Displaying calibrated near-real-time forest fire observations across India. Set <code>FIRMS_MAP_KEY</code> to connect live NASA feeds.
-          {% endif %}
-        </span>
-      </div>
-      <button class="banner-btn" onclick="openKeyModal()">
-        {% if has_key %}⚙️ Update API Key{% else %}🔑 Configure FIRMS Key{% endif %}
-      </button>
-    </div>
 
-    <!-- Live KPI Summary Cards -->
-    <div class="kpi-grid">
-      <div class="kpi-card">
-        <div class="kpi-label">Active Detections (India)</div>
-        <div class="kpi-value" id="kpi-total-fires">—</div>
-        <div class="kpi-desc" id="kpi-filter-desc">Past 24 hours · Within India</div>
-      </div>
-      <div class="kpi-card">
-        <div class="kpi-label">Severe Fire Outbreaks</div>
-        <div class="kpi-value" id="kpi-severe-fires" style="color:#ef4444;">—</div>
-        <div class="kpi-desc">FRP &ge; 50 MW (Extreme intensity)</div>
-      </div>
-      <div class="kpi-card">
-        <div class="kpi-label">Peak Fire Radiative Power</div>
-        <div class="kpi-value" id="kpi-max-frp" style="color:#f97316;">—</div>
-        <div class="kpi-desc">Maximum thermal emission recorded</div>
-      </div>
-      <div class="kpi-card">
-        <div class="kpi-label">Average Thermal Intensity</div>
-        <div class="kpi-value" id="kpi-mean-frp" style="color:#eab308;">—</div>
-        <div class="kpi-desc">Mean Fire Radiative Power (MW)</div>
-      </div>
-    </div>
+  <!-- VIEW 1: ACTIVE SURVEILLANCE & NASA FIRMS -->
+  <main id="view-live" class="view-panel {% if active_tab == 'live' %}active{% endif %}">
 
-    <!-- Filter Toolbar -->
-    <div class="filter-bar">
-      <div class="filter-item">
-        <label>Satellite Instrument</label>
-        <select id="filter-source" onchange="loadLiveFires()">
-          <option value="ALL">All VIIRS Instruments (Aggregated)</option>
+    <!-- KPI Strip -->
+    <section class="metrics-strip">
+      <div class="metric-tile">
+        <div class="metric-header">
+          <span class="metric-title">Active Hotspots</span>
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" stroke-width="2"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+        </div>
+        <div class="metric-value" id="kpi-total">—</div>
+        <div class="metric-sub">Sovereign India Boundary Filtered</div>
+      </div>
+
+      <div class="metric-tile">
+        <div class="metric-header">
+          <span class="metric-title">Severe Outbreaks</span>
+          <span style="font-size:10px;color:#fb7185;font-weight:700;">&ge;50 MW</span>
+        </div>
+        <div class="metric-value" id="kpi-severe" style="color:#fb7185;">—</div>
+        <div class="metric-sub">Extreme Radiative Power Detections</div>
+      </div>
+
+      <div class="metric-tile">
+        <div class="metric-header">
+          <span class="metric-title">Peak FRP Intensity</span>
+          <span style="font-size:10px;color:#fb923c;font-weight:700;">Max MW</span>
+        </div>
+        <div class="metric-value mono" id="kpi-max-frp" style="color:#fb923c;">—</div>
+        <div class="metric-sub">Highest Single Radiative Signal</div>
+      </div>
+
+      <div class="metric-tile">
+        <div class="metric-header">
+          <span class="metric-title">Mean Intensity</span>
+          <span style="font-size:10px;color:#34d399;font-weight:700;">Avg MW</span>
+        </div>
+        <div class="metric-value mono" id="kpi-mean-frp" style="color:#34d399;">—</div>
+        <div class="metric-sub">Fleet-wide Thermal Radiation</div>
+      </div>
+    </section>
+
+    <!-- Controls Bar -->
+    <section class="control-bar">
+      <div class="control-group">
+        <label>Sensor</label>
+        <select id="ctrl-source" class="control-select" onchange="refreshSurveillanceData()">
+          <option value="ALL">All VIIRS (Suomi-NPP + NOAA-20 + NOAA-21)</option>
           <option value="VIIRS_SNPP_NRT">Suomi-NPP VIIRS (375m NRT)</option>
           <option value="VIIRS_NOAA20_NRT">NOAA-20 VIIRS (375m NRT)</option>
           <option value="VIIRS_NOAA21_NRT">NOAA-21 VIIRS (375m NRT)</option>
         </select>
       </div>
 
-      <div class="filter-item">
-        <label>Observation Window</label>
-        <select id="filter-days" onchange="loadLiveFires()">
-          <option value="1">Past 24 Hours (1 Day)</option>
-          <option value="2">Past 48 Hours (2 Days)</option>
-          <option value="3">Past 72 Hours (3 Days)</option>
+      <div class="control-group">
+        <label>Temporal Window</label>
+        <select id="ctrl-days" class="control-select" onchange="refreshSurveillanceData()">
+          <option value="1">Past 24 Hours</option>
+          <option value="2">Past 48 Hours</option>
+          <option value="3">Past 72 Hours</option>
           <option value="5">Past 5 Days</option>
         </select>
       </div>
 
-      <div class="filter-item">
-        <label>Minimum Intensity (FRP)</label>
-        <select id="filter-frp" onchange="loadLiveFires()">
+      <div class="control-group">
+        <label>Intensity (FRP)</label>
+        <select id="ctrl-min-frp" class="control-select" onchange="refreshSurveillanceData()">
           <option value="0">All Thermal Signals (&gt; 0 MW)</option>
           <option value="5">Moderate &amp; Above (&ge; 5 MW)</option>
-          <option value="20">High Risk (&ge; 20 MW)</option>
+          <option value="20">High Severity (&ge; 20 MW)</option>
           <option value="50">Severe Outbreaks (&ge; 50 MW)</option>
         </select>
       </div>
 
-      <div class="filter-item">
-        <label>Confidence Threshold</label>
-        <select id="filter-conf" onchange="loadLiveFires()">
+      <div class="control-group">
+        <label>Confidence</label>
+        <select id="ctrl-conf" class="control-select" onchange="refreshSurveillanceData()">
           <option value="all">All Confidence Levels</option>
-          <option value="nominal_or_high">Nominal &amp; High Confidence</option>
+          <option value="nominal_or_high">Nominal &amp; High</option>
           <option value="high">High Confidence Only</option>
         </select>
       </div>
 
-      <button class="refresh-btn" onclick="loadLiveFires()">
-        <span id="refresh-icon">🔄</span> Refresh Observations
+      <button class="btn-refresh" onclick="refreshSurveillanceData()">
+        <svg id="refresh-spinner" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+          <path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/>
+        </svg>
+        Refresh Feed
       </button>
-    </div>
+    </section>
 
-    <!-- Map and Feed Grid -->
-    <div class="live-grid">
-      <!-- Interactive Leaflet Map -->
-      <div class="map-container">
-        <div class="map-header">
-          <div class="map-title">📍 Sovereign India Active Fire Observations (NASA FIRMS)</div>
-          <div class="map-legend">
-            <div class="legend-item"><div class="legend-dot" style="background:#eab308"></div> &lt;5 MW</div>
-            <div class="legend-item"><div class="legend-dot" style="background:#f97316"></div> 5–20 MW</div>
-            <div class="legend-item"><div class="legend-dot" style="background:#ef4444"></div> 20–50 MW</div>
-            <div class="legend-item"><div class="legend-dot" style="background:#a855f7"></div> &ge;50 MW</div>
+    <!-- GIS Workspace -->
+    <div class="gis-layout">
+      <!-- Leaflet Map Shell -->
+      <div class="map-shell">
+        <div class="map-topbar">
+          <span>Sovereign India Surveillance Grid &middot; Survey of India Spatial Extent</span>
+          <div class="map-legend-pills">
+            <div class="legend-pill"><div class="legend-dot" style="background:#10b981"></div> &lt;5 MW</div>
+            <div class="legend-pill"><div class="legend-dot" style="background:#f59e0b"></div> 5–20 MW</div>
+            <div class="legend-pill"><div class="legend-dot" style="background:#f97316"></div> 20–50 MW</div>
+            <div class="legend-pill"><div class="legend-dot" style="background:#f43f5e"></div> &ge;50 MW</div>
           </div>
         </div>
         <div id="india-map"></div>
       </div>
 
-      <!-- Live Priority Alert Feed -->
-      <div class="feed-container">
-        <div class="feed-header">
-          <div class="feed-title">🚨 Priority Alert Feed</div>
-          <span id="feed-count-badge" style="font-size:11px;color:var(--text-muted);">Showing top alerts</span>
+      <!-- Feed Shell -->
+      <aside class="feed-shell">
+        <div class="feed-topbar">
+          <div class="feed-heading">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/>
+            </svg>
+            Live Priority Incidents
+          </div>
+          <span class="feed-badge" id="feed-count">0 Detections</span>
         </div>
-        <div class="feed-list" id="alert-feed-list">
-          <!-- Populated by JavaScript -->
+        <div class="feed-scroll" id="incident-feed">
+          <!-- Dynamically inserted by JS -->
         </div>
-      </div>
+      </aside>
     </div>
+
   </main>
 
 
-  <!-- TAB 2: RESEARCH 31-FEATURE MODEL RISK CLASSIFIER -->
-  <main id="tab-model" class="tab-content {% if active_tab == 'model' %}active{% endif %}">
+  <!-- VIEW 2: 31-FEATURE RESEARCH CLASSIFIER -->
+  <main id="view-model" class="view-panel {% if active_tab == 'model' %}active{% endif %}">
     
-    <div class="model-grid">
-      <!-- Left: 31 Features Form -->
+    <div class="model-layout">
+      
+      <!-- Input Workspace -->
       <div class="model-card">
-        <h2 class="section-title">Validated Research Model Predictor</h2>
-        <p class="section-desc">
-          Evaluates fire occurrence probability using the validated 31-feature <code>HistGradientBoostingClassifier</code> (2018–2025 dataset).
-        </p>
-
-        <!-- Presets -->
-        <div class="preset-bar">
-          <span style="font-size:11px;color:var(--text-muted);align-self:center;">Presets:</span>
-          <button type="button" class="preset-btn" onclick="applyPreset('summer_high')">🔥 Peak Summer Dry Corridor (High Risk)</button>
-          <button type="button" class="preset-btn" onclick="applyPreset('monsoon_low')">🌧️ Monsoon Wet Forest (Low Risk)</button>
-          <button type="button" class="preset-btn" onclick="applyPreset('western_ghats')">🌿 Western Ghats Transition</button>
-          <button type="button" class="preset-btn" onclick="resetForm()">↺ Reset</button>
+        <div class="card-title-group">
+          <h2>Multi-Timescale Classifier Evaluation</h2>
+          <p>Validated <code>HistGradientBoostingClassifier</code> predicting FIRMS fire cell occurrence using 31 meteorological &amp; spatiotemporal features.</p>
         </div>
 
-        <form action="{{ url_for('predict') }}" method="post" id="model-form">
+        <!-- Presets -->
+        <div class="preset-strip">
+          <span class="preset-label">Calibration Presets:</span>
+          <button type="button" class="preset-pill" onclick="loadScenario('summer_peak')">Peak Pre-Monsoon Dry (Mayurbhanj / Similipal)</button>
+          <button type="button" class="preset-pill" onclick="loadScenario('western_ghats')">Western Ghats Transition (Bandipur)</button>
+          <button type="button" class="preset-pill" onclick="loadScenario('monsoon_wet')">Monsoon Saturated (Konkan Low Risk)</button>
+          <button type="button" class="preset-pill" onclick="resetModelInputs()">Reset</button>
+        </div>
+
+        <form action="{{ url_for('predict') }}" method="post" id="model-prediction-form">
           
-          <!-- Group 1: Spatial & Temporal -->
-          <div class="field-group">
-            <div class="group-header">1. Spatial &amp; Temporal Cell (5 Features)</div>
-            <div class="fields-grid">
-              <div class="field-box">
-                <label>Grid Latitude (°N)</label>
+          <!-- Group 1: Spatiotemporal Context -->
+          <div class="form-section">
+            <div class="section-tag">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/></svg>
+              1. Spatiotemporal Coordinates (5 Features)
+            </div>
+            <div class="inputs-grid-5">
+              <div class="input-field">
+                <label>Grid Lat (°N)</label>
                 <input type="number" step="any" name="grid_lat" id="in_grid_lat" value="{{ input_values.get('grid_lat', 21.8) }}" required>
               </div>
-              <div class="field-box">
-                <label>Grid Longitude (°E)</label>
+              <div class="input-field">
+                <label>Grid Lon (°E)</label>
                 <input type="number" step="any" name="grid_lon" id="in_grid_lon" value="{{ input_values.get('grid_lon', 86.3) }}" required>
               </div>
-              <div class="field-box">
+              <div class="input-field">
                 <label>Hour (0–23 UTC)</label>
                 <input type="number" step="any" name="hour" id="in_hour" value="{{ input_values.get('hour', 8) }}" required>
               </div>
-              <div class="field-box">
+              <div class="input-field">
                 <label>Year</label>
                 <input type="number" step="any" name="year" id="in_year" value="{{ input_values.get('year', 2024) }}" required>
               </div>
-              <div class="field-box">
+              <div class="input-field">
                 <label>Month (1–12)</label>
                 <input type="number" step="any" name="month" id="in_month" value="{{ input_values.get('month', 4) }}" required>
               </div>
             </div>
           </div>
 
-          <!-- Group 2: 1-Day Weather -->
-          <div class="field-group">
-            <div class="group-header">2. 1-Day Weather Observations (6 Features)</div>
-            <div class="fields-grid">
-              <div class="field-box"><label>Temp 1d (°C)</label><input type="number" step="any" name="temp_1d" id="in_temp_1d" value="{{ input_values.get('temp_1d', 38.5) }}" required></div>
-              <div class="field-box"><label>Rel Humidity 1d (%)</label><input type="number" step="any" name="rh_1d" id="in_rh_1d" value="{{ input_values.get('rh_1d', 22.0) }}" required></div>
-              <div class="field-box"><label>Wind 1d (m/s)</label><input type="number" step="any" name="wind_1d" id="in_wind_1d" value="{{ input_values.get('wind_1d', 4.2) }}" required></div>
-              <div class="field-box"><label>Pressure 1d (hPa)</label><input type="number" step="any" name="pressure_1d" id="in_pressure_1d" value="{{ input_values.get('pressure_1d', 1004.0) }}" required></div>
-              <div class="field-box"><label>Soil Moisture 1d</label><input type="number" step="any" name="soil_1d" id="in_soil_1d" value="{{ input_values.get('soil_1d', 0.12) }}" required></div>
-              <div class="field-box"><label>Rain 1d (mm)</label><input type="number" step="any" name="rain_1d" id="in_rain_1d" value="{{ input_values.get('rain_1d', 0.0) }}" required></div>
+          <!-- Group 2: Immediate 1-Day Weather -->
+          <div class="form-section">
+            <div class="section-tag">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/></svg>
+              2. 1-Day Surface Meteorological Conditions (6 Features)
+            </div>
+            <div class="inputs-grid-6">
+              <div class="input-field">
+                <label>Temp 1d (°C)</label>
+                <input type="number" step="any" name="temp_1d" id="in_temp_1d" value="{{ input_values.get('temp_1d', 39.5) }}" required>
+              </div>
+              <div class="input-field">
+                <label>RH 1d (%)</label>
+                <input type="number" step="any" name="rh_1d" id="in_rh_1d" value="{{ input_values.get('rh_1d', 18.0) }}" required>
+              </div>
+              <div class="input-field">
+                <label>Wind 1d (m/s)</label>
+                <input type="number" step="any" name="wind_1d" id="in_wind_1d" value="{{ input_values.get('wind_1d', 4.8) }}" required>
+              </div>
+              <div class="input-field">
+                <label>Pressure (hPa)</label>
+                <input type="number" step="any" name="pressure_1d" id="in_pressure_1d" value="{{ input_values.get('pressure_1d', 1003.0) }}" required>
+              </div>
+              <div class="input-field">
+                <label>Soil Moisture</label>
+                <input type="number" step="any" name="soil_1d" id="in_soil_1d" value="{{ input_values.get('soil_1d', 0.08) }}" required>
+              </div>
+              <div class="input-field">
+                <label>Rain 1d (mm)</label>
+                <input type="number" step="any" name="rain_1d" id="in_rain_1d" value="{{ input_values.get('rain_1d', 0.0) }}" required>
+              </div>
             </div>
           </div>
 
-          <!-- Group 3: 3-Day Multi-Timescale Weather -->
-          <div class="field-group">
-            <div class="group-header">3. 3-Day Multi-Timescale Weather (10 Features)</div>
-            <div class="fields-grid">
-              <div class="field-box"><label>Temp 3d Mean (°C)</label><input type="number" step="any" name="temp_3d_mean" id="in_temp_3d_mean" value="{{ input_values.get('temp_3d_mean', 37.8) }}" required></div>
-              <div class="field-box"><label>Temp 3d Max (°C)</label><input type="number" step="any" name="temp_3d_max" id="in_temp_3d_max" value="{{ input_values.get('temp_3d_max', 41.2) }}" required></div>
-              <div class="field-box"><label>Temp 3d Min (°C)</label><input type="number" step="any" name="temp_3d_min" id="in_temp_3d_min" value="{{ input_values.get('temp_3d_min', 26.5) }}" required></div>
-              <div class="field-box"><label>RH 3d Mean (%)</label><input type="number" step="any" name="rh_3d_mean" id="in_rh_3d_mean" value="{{ input_values.get('rh_3d_mean', 24.1) }}" required></div>
-              <div class="field-box"><label>RH 3d Min (%)</label><input type="number" step="any" name="rh_3d_min" id="in_rh_3d_min" value="{{ input_values.get('rh_3d_min', 16.0) }}" required></div>
-              <div class="field-box"><label>Wind 3d Mean (m/s)</label><input type="number" step="any" name="wind_3d_mean" id="in_wind_3d_mean" value="{{ input_values.get('wind_3d_mean', 3.9) }}" required></div>
-              <div class="field-box"><label>Wind 3d Max (m/s)</label><input type="number" step="any" name="wind_3d_max" id="in_wind_3d_max" value="{{ input_values.get('wind_3d_max', 6.8) }}" required></div>
-              <div class="field-box"><label>Pressure 3d Mean</label><input type="number" step="any" name="pressure_3d_mean" id="in_pressure_3d_mean" value="{{ input_values.get('pressure_3d_mean', 1005.1) }}" required></div>
-              <div class="field-box"><label>Soil 3d Mean</label><input type="number" step="any" name="soil_3d_mean" id="in_soil_3d_mean" value="{{ input_values.get('soil_3d_mean', 0.13) }}" required></div>
-              <div class="field-box"><label>Rain 3d Total (mm)</label><input type="number" step="any" name="rain_3d_total" id="in_rain_3d_total" value="{{ input_values.get('rain_3d_total', 0.0) }}" required></div>
+          <!-- Group 3: Antecedent Multi-Timescale Conditions (Comparative Matrix) -->
+          <div class="form-section">
+            <div class="section-tag">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+              3. Multi-Timescale Meteorological Memory (3-Day &amp; 7-Day &middot; 20 Features)
+            </div>
+            
+            <div class="matrix-container">
+              <table class="weather-matrix">
+                <thead>
+                  <tr>
+                    <th>Variable</th>
+                    <th>3-Day Window Mean/Total</th>
+                    <th>3-Day Extrema</th>
+                    <th>7-Day Window Mean/Total</th>
+                    <th>7-Day Extrema</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td>Temperature (°C)</td>
+                    <td><input class="matrix-input" type="number" step="any" name="temp_3d_mean" id="in_temp_3d_mean" value="{{ input_values.get('temp_3d_mean', 38.6) }}" required></td>
+                    <td>
+                      <div style="display:flex;gap:4px;">
+                        <input class="matrix-input" title="Max" type="number" step="any" name="temp_3d_max" id="in_temp_3d_max" value="{{ input_values.get('temp_3d_max', 42.1) }}" required>
+                        <input class="matrix-input" title="Min" type="number" step="any" name="temp_3d_min" id="in_temp_3d_min" value="{{ input_values.get('temp_3d_min', 27.0) }}" required>
+                      </div>
+                    </td>
+                    <td><input class="matrix-input" type="number" step="any" name="temp_7d_mean" id="in_temp_7d_mean" value="{{ input_values.get('temp_7d_mean', 37.8) }}" required></td>
+                    <td>
+                      <div style="display:flex;gap:4px;">
+                        <input class="matrix-input" title="Max" type="number" step="any" name="temp_7d_max" id="in_temp_7d_max" value="{{ input_values.get('temp_7d_max', 43.0) }}" required>
+                        <input class="matrix-input" title="Min" type="number" step="any" name="temp_7d_min" id="in_temp_7d_min" value="{{ input_values.get('temp_7d_min', 25.5) }}" required>
+                      </div>
+                    </td>
+                  </tr>
+                  <tr>
+                    <td>Rel. Humidity (%)</td>
+                    <td><input class="matrix-input" type="number" step="any" name="rh_3d_mean" id="in_rh_3d_mean" value="{{ input_values.get('rh_3d_mean', 20.5) }}" required></td>
+                    <td><input class="matrix-input" title="Min" type="number" step="any" name="rh_3d_min" id="in_rh_3d_min" value="{{ input_values.get('rh_3d_min', 14.0) }}" required></td>
+                    <td><input class="matrix-input" type="number" step="any" name="rh_7d_mean" id="in_rh_7d_mean" value="{{ input_values.get('rh_7d_mean', 23.0) }}" required></td>
+                    <td><input class="matrix-input" title="Min" type="number" step="any" name="rh_7d_min" id="in_rh_7d_min" value="{{ input_values.get('rh_7d_min', 12.0) }}" required></td>
+                  </tr>
+                  <tr>
+                    <td>Wind Speed (m/s)</td>
+                    <td><input class="matrix-input" type="number" step="any" name="wind_3d_mean" id="in_wind_3d_mean" value="{{ input_values.get('wind_3d_mean', 4.2) }}" required></td>
+                    <td><input class="matrix-input" title="Max" type="number" step="any" name="wind_3d_max" id="in_wind_3d_max" value="{{ input_values.get('wind_3d_max', 7.5) }}" required></td>
+                    <td><input class="matrix-input" type="number" step="any" name="wind_7d_mean" id="in_wind_7d_mean" value="{{ input_values.get('wind_7d_mean', 3.9) }}" required></td>
+                    <td><input class="matrix-input" title="Max" type="number" step="any" name="wind_7d_max" id="in_wind_7d_max" value="{{ input_values.get('wind_7d_max', 8.1) }}" required></td>
+                  </tr>
+                  <tr>
+                    <td>Surface Pressure</td>
+                    <td><input class="matrix-input" type="number" step="any" name="pressure_3d_mean" id="in_pressure_3d_mean" value="{{ input_values.get('pressure_3d_mean', 1004.2) }}" required></td>
+                    <td><span style="color:var(--text-muted);">&mdash;</span></td>
+                    <td><input class="matrix-input" type="number" step="any" name="pressure_7d_mean" id="in_pressure_7d_mean" value="{{ input_values.get('pressure_7d_mean', 1005.0) }}" required></td>
+                    <td><span style="color:var(--text-muted);">&mdash;</span></td>
+                  </tr>
+                  <tr>
+                    <td>Soil Moisture</td>
+                    <td><input class="matrix-input" type="number" step="any" name="soil_3d_mean" id="in_soil_3d_mean" value="{{ input_values.get('soil_3d_mean', 0.09) }}" required></td>
+                    <td><span style="color:var(--text-muted);">&mdash;</span></td>
+                    <td><input class="matrix-input" type="number" step="any" name="soil_7d_mean" id="in_soil_7d_mean" value="{{ input_values.get('soil_7d_mean', 0.10) }}" required></td>
+                    <td><span style="color:var(--text-muted);">&mdash;</span></td>
+                  </tr>
+                  <tr>
+                    <td>Precipitation Total (mm)</td>
+                    <td><input class="matrix-input" type="number" step="any" name="rain_3d_total" id="in_rain_3d_total" value="{{ input_values.get('rain_3d_total', 0.0) }}" required></td>
+                    <td><span style="color:var(--text-muted);">&mdash;</span></td>
+                    <td><input class="matrix-input" type="number" step="any" name="rain_7d_total" id="in_rain_7d_total" value="{{ input_values.get('rain_7d_total', 0.0) }}" required></td>
+                    <td><span style="color:var(--text-muted);">&mdash;</span></td>
+                  </tr>
+                </tbody>
+              </table>
             </div>
           </div>
 
-          <!-- Group 4: 7-Day Multi-Timescale Weather -->
-          <div class="field-group">
-            <div class="group-header">4. 7-Day Multi-Timescale Weather (10 Features)</div>
-            <div class="fields-grid">
-              <div class="field-box"><label>Temp 7d Mean (°C)</label><input type="number" step="any" name="temp_7d_mean" id="in_temp_7d_mean" value="{{ input_values.get('temp_7d_mean', 36.9) }}" required></div>
-              <div class="field-box"><label>Temp 7d Max (°C)</label><input type="number" step="any" name="temp_7d_max" id="in_temp_7d_max" value="{{ input_values.get('temp_7d_max', 42.0) }}" required></div>
-              <div class="field-box"><label>Temp 7d Min (°C)</label><input type="number" step="any" name="temp_7d_min" id="in_temp_7d_min" value="{{ input_values.get('temp_7d_min', 24.8) }}" required></div>
-              <div class="field-box"><label>RH 7d Mean (%)</label><input type="number" step="any" name="rh_7d_mean" id="in_rh_7d_mean" value="{{ input_values.get('rh_7d_mean', 28.3) }}" required></div>
-              <div class="field-box"><label>RH 7d Min (%)</label><input type="number" step="any" name="rh_7d_min" id="in_rh_7d_min" value="{{ input_values.get('rh_7d_min', 14.5) }}" required></div>
-              <div class="field-box"><label>Wind 7d Mean (m/s)</label><input type="number" step="any" name="wind_7d_mean" id="in_wind_7d_mean" value="{{ input_values.get('wind_7d_mean', 3.7) }}" required></div>
-              <div class="field-box"><label>Wind 7d Max (m/s)</label><input type="number" step="any" name="wind_7d_max" id="in_wind_7d_max" value="{{ input_values.get('wind_7d_max', 7.4) }}" required></div>
-              <div class="field-box"><label>Pressure 7d Mean</label><input type="number" step="any" name="pressure_7d_mean" id="in_pressure_7d_mean" value="{{ input_values.get('pressure_7d_mean', 1006.2) }}" required></div>
-              <div class="field-box"><label>Soil 7d Mean</label><input type="number" step="any" name="soil_7d_mean" id="in_soil_7d_mean" value="{{ input_values.get('soil_7d_mean', 0.14) }}" required></div>
-              <div class="field-box"><label>Rain 7d Total (mm)</label><input type="number" step="any" name="rain_7d_total" id="in_rain_7d_total" value="{{ input_values.get('rain_7d_total', 0.0) }}" required></div>
-            </div>
-          </div>
-
-          <button type="submit" class="submit-btn">CLASSIFY FIRE RISK (31 FEATURES)</button>
+          <button type="submit" class="btn-classify">
+            Evaluate Risk Vector (31 Features)
+          </button>
         </form>
       </div>
 
-      <!-- Right: Inference Results & Model Metrics -->
-      <div class="model-card result-card">
-        <div>
-          <div style="font-size:11px;font-weight:700;letter-spacing:1px;color:var(--text-muted);">RESEARCH MODEL OUTPUT</div>
+      <!-- Inference Output & Scientific Benchmarks -->
+      <aside class="output-shell">
+        
+        <!-- Result Panel -->
+        <div class="prediction-box">
+          <span class="output-eyebrow">Classifier Output</span>
           
           {% if error %}
-            <div style="color:#f87171;margin-top:14px;font-size:13px;">{{ error }}</div>
+            <div style="color:#fb7185;margin-top:14px;font-size:13px;">{{ error }}</div>
           {% elif result %}
-            <div class="result-score">{{ "%.1f"|format(result.probability) }}%</div>
-            <div class="result-badge {% if result.prediction %}danger{% else %}safe{% endif %}">
+            <div class="prob-display mono">{{ "%.1f"|format(result.probability) }}%</div>
+            <span class="decision-pill {% if result.prediction %}decision-danger{% else %}decision-safe{% endif %}">
               {{ result.label }}
+            </span>
+            <div class="prob-bar">
+              <div class="prob-fill" style="width: {{ result.probability }}%;"></div>
             </div>
-            <p style="font-size:13px;color:var(--text-muted);margin-top:14px;line-height:1.6;">
-              Classification probability generated by the research-validated <code>HistGradientBoostingClassifier</code>.
+            <p style="font-size:12px;color:var(--text-secondary);margin-top:10px;">
+              Threshold &tau; = 0.50 &middot; P(Fire Occurrence) = {{ "%.4f"|format(result.probability / 100.0) }}
             </p>
           {% else %}
-            <div class="result-score">—</div>
-            <div class="result-badge safe">READY FOR INFERENCE</div>
-            <p style="font-size:13px;color:var(--text-muted);margin-top:14px;line-height:1.6;">
-              Select a preset or enter inputs, then click <strong>Classify Fire Risk</strong>.
+            <div class="prob-display mono">&mdash;</div>
+            <span class="decision-pill decision-safe">Standing By</span>
+            <div class="prob-bar"><div class="prob-fill" style="width: 0%;"></div></div>
+            <p style="font-size:12px;color:var(--text-muted);">
+              Populate inputs or click a calibration preset, then execute evaluation.
             </p>
           {% endif %}
+        </div>
 
-          <!-- Validated Research Performance Metrics -->
-          {% if metrics and metrics.get('test') %}
-          <div class="metrics-panel">
-            <div class="metrics-panel-title">Validated Test Set Performance</div>
-            <div class="metrics-2x2">
-              <div class="metric-box">
-                <small>Accuracy</small>
-                <strong>{{ "%.2f%%"|format(metrics.test.accuracy * 100) }}</strong>
-              </div>
-              <div class="metric-box">
-                <small>F1 Score</small>
-                <strong>{{ "%.4f"|format(metrics.test.f1) }}</strong>
-              </div>
-              <div class="metric-box">
-                <small>ROC-AUC</small>
-                <strong>{{ "%.4f"|format(metrics.test.roc_auc) }}</strong>
-              </div>
-              <div class="metric-box">
-                <small>PR-AUC</small>
-                <strong>{{ "%.4f"|format(metrics.test.pr_auc) }}</strong>
-              </div>
+        <!-- Validated Research Performance Card -->
+        {% if metrics and metrics.get('test') %}
+        <div class="benchmark-box">
+          <div class="benchmark-title">Published Empirical Test Benchmarks</div>
+          <div class="benchmark-grid">
+            <div class="benchmark-tile">
+              <span>Test Accuracy</span>
+              <strong class="mono">{{ "%.2f%%"|format(metrics.test.accuracy * 100) }}</strong>
+            </div>
+            <div class="benchmark-tile">
+              <span>Test F1-Score</span>
+              <strong class="mono">{{ "%.4f"|format(metrics.test.f1) }}</strong>
+            </div>
+            <div class="benchmark-tile">
+              <span>ROC-AUC</span>
+              <strong class="mono">{{ "%.4f"|format(metrics.test.roc_auc) }}</strong>
+            </div>
+            <div class="benchmark-tile">
+              <span>PR-AUC</span>
+              <strong class="mono">{{ "%.4f"|format(metrics.test.pr_auc) }}</strong>
             </div>
           </div>
-          {% endif %}
+        </div>
+        {% endif %}
+
+        <!-- Research Context & Limitations -->
+        <div class="citation-box">
+          <strong>Methodology Note:</strong> This model is the validated research classifier trained on 131,000 spatial cells across India (2018–2025). The live satellite surveillance stream on Tab 1 operates as a complementary near-real-time sensor feed and does not alter published model weights or evaluation splits.
         </div>
 
-        <div class="research-note">
-          <strong>Research Note:</strong> The 31-feature classifier and published experimental results are frozen and unmodifiable. The live detection system on Tab 1 operates as a complementary near-real-time observational tool.
-        </div>
-      </div>
+      </aside>
+
     </div>
+
   </main>
 
 </div>
 
-<!-- Modal for Setting NASA FIRMS MAP_KEY -->
-<div id="key-modal" class="modal-overlay">
-  <div class="modal-box">
-    <div class="modal-title">🔑 Configure NASA FIRMS Key</div>
-    <p class="modal-desc">
-      NASA FIRMS provides free API access to VIIRS near-real-time active-fire observations. Obtain a free <code>MAP_KEY</code> at <a href="https://firms.modaps.eosdis.nasa.gov/api/map_key" target="_blank" style="color:#4ade80;">NASA FIRMS API</a>.
+<!-- Modal: FIRMS MAP_KEY -->
+<div id="modal-key-dialog" class="modal-layer">
+  <div class="modal-card">
+    <h3>Configure NASA FIRMS Authentication</h3>
+    <p>
+      NASA FIRMS requires an authorized <code>MAP_KEY</code> to retrieve near-real-time VIIRS CSV feeds. Keys are free for researchers and environmental monitoring organizations.
     </p>
-    <input type="text" id="firms-key-input" class="modal-input" placeholder="Paste your FIRMS MAP_KEY here (e.g., 32 hex characters)">
-    <div class="modal-actions">
-      <button class="modal-btn-cancel" onclick="closeKeyModal()">Cancel</button>
-      <button class="modal-btn-save" onclick="saveFirmsKey()">Apply Key</button>
+    <input type="text" id="input-firms-key" class="modal-input" placeholder="Paste your NASA FIRMS MAP_KEY...">
+    <div class="modal-buttons">
+      <button class="btn-cancel" onclick="toggleKeyModal(false)">Dismiss</button>
+      <button class="btn-save" onclick="submitFirmsKey()">Register Key in Session</button>
     </div>
   </div>
 </div>
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
-let map = null;
-let markersLayer = null;
-let boundaryLayer = null;
-let currentFires = [];
+let leafletMap = null;
+let fireMarkersGroup = null;
+let sovereignBoundary = null;
+let currentDetections = [];
 
-// Tab switching
-function switchTab(tabId) {
-  document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
-  document.querySelectorAll('.tab-content').forEach(tc => tc.classList.remove('active'));
-  
+// Switch Tabs
+function activateTab(tabId) {
+  document.querySelectorAll('.view-btn').forEach(btn => btn.classList.remove('active'));
+  document.querySelectorAll('.view-panel').forEach(p => p.classList.remove('active'));
+
   if (tabId === 'live') {
-    document.querySelector("button[onclick=\"switchTab('live')\"]").classList.add('active');
-    document.getElementById('tab-live').classList.add('active');
-    if (map) {
-      setTimeout(() => map.invalidateSize(), 150);
+    document.querySelector("button[onclick=\"activateTab('live')\"]").classList.add('active');
+    document.getElementById('view-live').classList.add('active');
+    if (leafletMap) {
+      setTimeout(() => leafletMap.invalidateSize(), 100);
     }
   } else {
-    document.querySelector("button[onclick=\"switchTab('model')\"]").classList.add('active');
-    document.getElementById('tab-model').classList.add('active');
+    document.querySelector("button[onclick=\"activateTab('model')\"]").classList.add('active');
+    document.getElementById('view-model').classList.add('active');
   }
 }
 
-// Modal controls
-function openKeyModal() {
-  document.getElementById('key-modal').classList.add('active');
-}
-function closeKeyModal() {
-  document.getElementById('key-modal').classList.remove('active');
+// Modal handlers
+function toggleKeyModal(show) {
+  const modal = document.getElementById('modal-key-dialog');
+  if (show) modal.classList.add('open');
+  else modal.classList.remove('open');
 }
 
-async function saveFirmsKey() {
-  const key = document.getElementById('firms-key-input').value.trim();
+async function submitFirmsKey() {
+  const key = document.getElementById('input-firms-key').value.trim();
   if (!key) return;
   try {
     const res = await fetch('/api/set-key', {
@@ -995,210 +1348,210 @@ async function saveFirmsKey() {
       headers: {'Content-Type': 'application/json'},
       body: JSON.stringify({key})
     });
-    const data = await res.json();
-    if (data.status === 'success') {
-      closeKeyModal();
-      loadLiveFires();
+    const d = await res.json();
+    if (d.status === 'success') {
+      toggleKeyModal(false);
+      refreshSurveillanceData();
     } else {
-      alert(data.message || 'Failed to apply key');
+      alert(d.message || 'Key validation failed');
     }
   } catch (err) {
-    alert('Error connecting to server: ' + err);
+    alert('Communication error: ' + err);
   }
 }
 
 // Map Initialization
-function initMap() {
-  if (map) return;
-  
-  // Center map on India
-  map = L.map('india-map', {
+function ensureMap() {
+  if (leafletMap) return;
+
+  leafletMap = L.map('india-map', {
     center: [22.8, 80.5],
     zoom: 5,
     minZoom: 4,
-    maxZoom: 14
+    maxZoom: 14,
+    zoomControl: true
   });
 
-  // Dark basemap
+  // Polished CartoDB Dark Matter tiles
   L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
-    attribution: '&copy; <a href="https://carto.com/">CARTO</a> &copy; OpenStreetMap',
+    attribution: '&copy; CartoDB &copy; OpenStreetMap &copy; NASA FIRMS',
     subdomains: 'abcd',
     maxZoom: 19
-  }).addTo(map);
+  }).addTo(leafletMap);
 
-  markersLayer = L.layerGroup().addTo(map);
+  fireMarkersGroup = L.layerGroup().addTo(leafletMap);
 
-  // Load India sovereign boundary
+  // Load Sovereign India Boundary
   fetch('/api/india-boundary')
     .then(r => r.json())
     .then(geojson => {
-      boundaryLayer = L.geoJSON(geojson, {
+      sovereignBoundary = L.geoJSON(geojson, {
         style: {
-          color: '#22c55e',
-          weight: 1.8,
-          opacity: 0.7,
-          fillColor: '#15803d',
-          fillOpacity: 0.04
+          color: '#10b981',
+          weight: 1.5,
+          opacity: 0.6,
+          fillColor: '#059669',
+          fillOpacity: 0.03
         }
-      }).addTo(map);
+      }).addTo(leafletMap);
       try {
-        map.fitBounds(boundaryLayer.getBounds(), {padding: [20, 20]});
+        leafletMap.fitBounds(sovereignBoundary.getBounds(), {padding: [16, 16]});
       } catch (e) {}
     })
-    .catch(err => console.warn('Could not load boundary geojson:', err));
+    .catch(e => console.warn('Boundary load notice:', e));
 }
 
-// Severity color mapping
-function getSeverityColor(frp) {
-  if (frp >= 50.0) return '#ef4444'; // Red/Crimson
+function getFrpColor(frp) {
+  if (frp >= 50.0) return '#f43f5e'; // Rose/Crimson
   if (frp >= 20.0) return '#f97316'; // Orange
-  if (frp >= 5.0) return '#eab308';  // Amber/Yellow
-  return '#86efac';                  // Pale Green
+  if (frp >= 5.0)  return '#f59e0b'; // Amber
+  return '#10b981';                  // Emerald
 }
 
-function getRadius(frp) {
-  return Math.min(18, Math.max(5, Math.sqrt(frp) * 2));
+function calculateRadius(frp) {
+  return Math.min(16, Math.max(5, Math.sqrt(frp) * 2.2));
 }
 
-// Fetch live fires
-async function loadLiveFires() {
-  initMap();
-  const refreshIcon = document.getElementById('refresh-icon');
-  if (refreshIcon) refreshIcon.style.animation = 'spin 1s infinite linear';
+// Fetch Active Surveillance Feeds
+async function refreshSurveillanceData() {
+  ensureMap();
+  const spinner = document.getElementById('refresh-spinner');
+  if (spinner) spinner.style.animation = 'spin 0.8s infinite linear';
 
-  const source = document.getElementById('filter-source').value;
-  const days = document.getElementById('filter-days').value;
-  const minFrp = document.getElementById('filter-frp').value;
-  const conf = document.getElementById('filter-conf').value;
+  const source = document.getElementById('ctrl-source').value;
+  const days = document.getElementById('ctrl-days').value;
+  const minFrp = document.getElementById('ctrl-min-frp').value;
+  const conf = document.getElementById('ctrl-conf').value;
 
   try {
-    const url = `/api/live-fires?source=${source}&days=${days}&min_frp=${minFrp}&confidence=${conf}`;
-    const res = await fetch(url);
+    const res = await fetch(`/api/live-fires?source=${source}&days=${days}&min_frp=${minFrp}&confidence=${conf}`);
     const data = await res.json();
 
-    // Update Status Banner
-    const banner = document.getElementById('status-banner');
-    const bannerText = document.getElementById('banner-text');
-    const pulseDot = banner.querySelector('.pulse-dot');
-    
+    // Update Status Badge
+    const statusPill = document.getElementById('satellite-status');
+    const statusText = document.getElementById('status-text');
     if (data.is_demo) {
-      banner.className = 'status-banner banner-demo';
-      pulseDot.className = 'pulse-dot amber';
-      bannerText.innerHTML = `<strong>SIMULATION / DEMO MODE:</strong> ${data.message}`;
+      statusPill.className = 'status-pill status-demo';
+      statusText.textContent = 'Calibrated Demo Feed';
     } else {
-      banner.className = 'status-banner banner-live';
-      pulseDot.className = 'pulse-dot';
-      bannerText.innerHTML = `<strong>LIVE NASA FIRMS ACTIVE:</strong> ${data.message} · Filtered to India sovereign boundary.`;
+      statusPill.className = 'status-pill status-live';
+      statusText.textContent = 'NASA FIRMS Live Connected';
     }
 
     // Update KPIs
-    document.getElementById('kpi-total-fires').textContent = data.summary.total_fires.toLocaleString();
-    document.getElementById('kpi-severe-fires').textContent = data.summary.severe_count.toLocaleString();
+    document.getElementById('kpi-total').textContent = data.summary.total_fires.toLocaleString();
+    document.getElementById('kpi-severe').textContent = data.summary.severe_count.toLocaleString();
     document.getElementById('kpi-max-frp').textContent = data.summary.max_frp.toFixed(1) + ' MW';
     document.getElementById('kpi-mean-frp').textContent = data.summary.mean_frp.toFixed(1) + ' MW';
 
-    currentFires = data.fires || [];
-    renderMarkers(currentFires);
-    renderAlertFeed(currentFires);
+    currentDetections = data.fires || [];
+    renderMapMarkers(currentDetections);
+    renderIncidentList(currentDetections);
 
   } catch (err) {
-    console.error('Failed to load active fire data:', err);
+    console.error('Surveillance data fetch failed:', err);
   } finally {
-    if (refreshIcon) refreshIcon.style.animation = '';
+    if (spinner) spinner.style.animation = '';
   }
 }
 
-// Render Fire Markers on Map
-function renderMarkers(fires) {
-  if (!markersLayer) return;
-  markersLayer.clearLayers();
+// Render Markers
+function renderMapMarkers(fires) {
+  if (!fireMarkersGroup) return;
+  fireMarkersGroup.clearLayers();
 
   fires.forEach(f => {
-    const color = getSeverityColor(f.frp);
-    const radius = getRadius(f.frp);
+    const color = getFrpColor(f.frp);
+    const radius = calculateRadius(f.frp);
 
-    const circle = L.circleMarker([f.lat, f.lon], {
+    const marker = L.circleMarker([f.lat, f.lon], {
       radius: radius,
       fillColor: color,
       color: '#ffffff',
       weight: 1,
       opacity: 0.9,
-      fillOpacity: 0.75
+      fillOpacity: 0.8
     });
 
-    const popupContent = `
-      <div style="font-family:sans-serif;font-size:12px;min-width:200px;line-height:1.5;">
-        <div style="font-weight:800;font-size:14px;color:${color};margin-bottom:4px;">
-          ${f.frp} MW · ${f.severity.toUpperCase()} ALERT
+    const popupHtml = `
+      <div style="min-width:210px;">
+        <div class="popup-header">
+          <span class="popup-frp" style="color:${color};">${f.frp} MW</span>
+          <span class="severity-tag ${f.severity === 'severe' ? 'tag-severe' : (f.severity === 'high' ? 'tag-high' : (f.severity === 'moderate' ? 'tag-moderate' : 'tag-low'))}">
+            ${f.severity}
+          </span>
         </div>
-        <div><strong>Coordinates:</strong> ${f.lat}°N, ${f.lon}°E</div>
-        <div><strong>0.1° Grid:</strong> (${f.grid_lat}, ${f.grid_lon})</div>
-        <div><strong>Satellite:</strong> ${f.satellite}</div>
-        <div><strong>Acquisition:</strong> ${f.acq_date} ${f.acq_time}</div>
-        <div><strong>Confidence:</strong> ${f.confidence} (${f.daynight})</div>
-        ${f.bright_ti4 ? `<div><strong>Brightness Temp:</strong> ${f.bright_ti4} K</div>` : ''}
-        <button onclick="transferToModel(${f.grid_lat}, ${f.grid_lon}, '${f.raw_time}', '${f.acq_date}')" 
-                style="margin-top:8px;width:100%;padding:6px;background:#22c55e;border:0;border-radius:6px;color:#04140a;font-weight:700;cursor:pointer;">
-          🧪 Evaluate in 31-Feature Model
+        <table class="popup-table">
+          <tr><td>Coordinates</td><td class="mono">${f.lat}°N, ${f.lon}°E</td></tr>
+          <tr><td>Grid Cell</td><td class="mono">(${f.grid_lat}, ${f.grid_lon})</td></tr>
+          <tr><td>Sensor</td><td>${f.satellite}</td></tr>
+          <tr><td>Observed</td><td>${f.acq_date} ${f.acq_time}</td></tr>
+          <tr><td>Confidence</td><td>${f.confidence} (${f.daynight})</td></tr>
+          ${f.bright_ti4 ? `<tr><td>Brightness Temp</td><td class="mono">${f.bright_ti4} K</td></tr>` : ''}
+        </table>
+        <button class="popup-btn" onclick="bridgeToRiskModel(${f.grid_lat}, ${f.grid_lon}, '${f.raw_time}', '${f.acq_date}')">
+          Transfer Cell to Risk Model &rarr;
         </button>
       </div>
     `;
 
-    circle.bindPopup(popupContent);
-    circle._fireData = f;
-    markersLayer.addLayer(circle);
+    marker.bindPopup(popupHtml);
+    marker._detectionRef = f;
+    fireMarkersGroup.addLayer(marker);
   });
 }
 
-// Render Feed Sidebar
-function renderAlertFeed(fires) {
-  const feed = document.getElementById('alert-feed-list');
-  feed.innerHTML = '';
+// Render Incident Feed
+function renderIncidentList(fires) {
+  const container = document.getElementById('incident-feed');
+  const countBadge = document.getElementById('feed-count');
+  container.innerHTML = '';
+  countBadge.textContent = `${fires.length} Detections`;
 
   if (fires.length === 0) {
-    feed.innerHTML = `<div style="padding:20px;text-align:center;color:var(--text-muted);font-size:13px;">No active fire observations match the selected criteria within India.</div>`;
+    container.innerHTML = `<div style="padding:24px;text-align:center;color:var(--text-muted);font-size:12px;">No active fire detections match current filters within sovereign India.</div>`;
     return;
   }
 
   fires.slice(0, 50).forEach(f => {
     const card = document.createElement('div');
-    card.className = 'feed-card';
-    const badgeClass = f.severity === 'severe' ? 'badge-severe' : (f.severity === 'high' ? 'badge-high' : (f.severity === 'moderate' ? 'badge-moderate' : 'badge-low'));
-    
+    card.className = 'incident-item';
+    const tagClass = f.severity === 'severe' ? 'tag-severe' : (f.severity === 'high' ? 'tag-high' : (f.severity === 'moderate' ? 'tag-moderate' : 'tag-low'));
+
     card.innerHTML = `
-      <div class="feed-top">
-        <span class="feed-frp" style="color:${getSeverityColor(f.frp)}">${f.frp} MW</span>
-        <span class="feed-badge ${badgeClass}">${f.severity}</span>
+      <div class="incident-row-1">
+        <span class="incident-frp mono" style="color:${getFrpColor(f.frp)};">${f.frp} MW</span>
+        <span class="severity-tag ${tagClass}">${f.severity}</span>
       </div>
-      <div class="feed-coords">${f.lat}°N, ${f.lon}°E</div>
-      <div class="feed-meta">
-        <span>${f.satellite.split(' ')[0]} · ${f.confidence}</span>
+      <div class="incident-coords mono">${f.lat}°N, ${f.lon}°E &middot; Cell (${f.grid_lat}, ${f.grid_lon})</div>
+      <div class="incident-footer">
+        <span>${f.satellite.split(' ')[0]} &middot; ${f.confidence}</span>
         <span>${f.acq_time}</span>
       </div>
     `;
 
     card.onclick = () => {
-      map.flyTo([f.lat, f.lon], 9, {duration: 0.8});
-      markersLayer.eachLayer(layer => {
-        if (layer._fireData && layer._fireData.id === f.id) {
+      leafletMap.flyTo([f.lat, f.lon], 9, {duration: 0.8});
+      fireMarkersGroup.eachLayer(layer => {
+        if (layer._detectionRef && layer._detectionRef.id === f.id) {
           layer.openPopup();
         }
       });
     };
 
-    feed.appendChild(card);
+    container.appendChild(card);
   });
 }
 
-// Transfer live coordinate to 31-feature model
-function transferToModel(lat, lon, rawTime, acqDate) {
-  switchTab('model');
+// Transfer detection cell coordinates to research model
+function bridgeToRiskModel(lat, lon, rawTime, acqDate) {
+  activateTab('model');
   document.getElementById('in_grid_lat').value = lat;
   document.getElementById('in_grid_lon').value = lon;
-  
+
   if (rawTime && rawTime.length >= 2) {
-    const hour = parseInt(rawTime.substring(0, 2), 10);
-    if (!isNaN(hour)) document.getElementById('in_hour').value = hour;
+    const h = parseInt(rawTime.substring(0, 2), 10);
+    if (!isNaN(h)) document.getElementById('in_hour').value = h;
   }
   if (acqDate) {
     const parts = acqDate.split('-');
@@ -1207,33 +1560,33 @@ function transferToModel(lat, lon, rawTime, acqDate) {
       document.getElementById('in_month').value = parseInt(parts[1], 10);
     }
   }
-  document.getElementById('model-form').scrollIntoView({behavior: 'smooth'});
+  document.getElementById('model-prediction-form').scrollIntoView({behavior: 'smooth'});
 }
 
-// Presets for the 31-feature model
-const PRESETS = {
-  summer_high: {
+// Calibration Presets
+const SCENARIOS = {
+  summer_peak: {
     grid_lat: 21.8, grid_lon: 86.3, hour: 8, year: 2024, month: 4,
     temp_1d: 39.5, rh_1d: 18.0, wind_1d: 4.8, pressure_1d: 1003.0, soil_1d: 0.08, rain_1d: 0.0,
     temp_3d_mean: 38.6, temp_3d_max: 42.1, temp_3d_min: 27.0, rh_3d_mean: 20.5, rh_3d_min: 14.0, wind_3d_mean: 4.2, wind_3d_max: 7.5, pressure_3d_mean: 1004.2, soil_3d_mean: 0.09, rain_3d_total: 0.0,
     temp_7d_mean: 37.8, temp_7d_max: 43.0, temp_7d_min: 25.5, rh_7d_mean: 23.0, rh_7d_min: 12.0, wind_7d_mean: 3.9, wind_7d_max: 8.1, pressure_7d_mean: 1005.0, soil_7d_mean: 0.10, rain_7d_total: 0.0
-  },
-  monsoon_low: {
-    grid_lat: 18.5, grid_lon: 73.8, hour: 12, year: 2024, month: 7,
-    temp_1d: 26.2, rh_1d: 88.0, wind_1d: 6.2, pressure_1d: 1008.5, soil_1d: 0.42, rain_1d: 24.5,
-    temp_3d_mean: 25.8, temp_3d_max: 28.0, temp_3d_min: 23.5, rh_3d_mean: 85.2, rh_3d_min: 74.0, wind_3d_mean: 5.8, wind_3d_max: 9.4, pressure_3d_mean: 1007.8, soil_3d_mean: 0.40, rain_3d_total: 62.0,
-    temp_7d_mean: 25.4, temp_7d_max: 29.1, temp_7d_min: 22.8, rh_7d_mean: 86.8, rh_7d_min: 70.0, wind_7d_mean: 5.4, wind_7d_max: 11.2, pressure_7d_mean: 1008.2, soil_7d_mean: 0.39, rain_7d_total: 135.0
   },
   western_ghats: {
     grid_lat: 11.7, grid_lon: 76.6, hour: 9, year: 2024, month: 3,
     temp_1d: 34.0, rh_1d: 32.0, wind_1d: 3.5, pressure_1d: 1010.0, soil_1d: 0.15, rain_1d: 0.0,
     temp_3d_mean: 33.2, temp_3d_max: 36.5, temp_3d_min: 22.0, rh_3d_mean: 35.0, rh_3d_min: 25.0, wind_3d_mean: 3.2, wind_3d_max: 5.8, pressure_3d_mean: 1010.5, soil_3d_mean: 0.16, rain_3d_total: 0.0,
     temp_7d_mean: 32.5, temp_7d_max: 37.0, temp_7d_min: 21.5, rh_7d_mean: 38.0, rh_7d_min: 22.0, wind_7d_mean: 3.0, wind_7d_max: 6.5, pressure_7d_mean: 1011.0, soil_7d_mean: 0.18, rain_7d_total: 0.0
+  },
+  monsoon_wet: {
+    grid_lat: 18.5, grid_lon: 73.8, hour: 12, year: 2024, month: 7,
+    temp_1d: 26.2, rh_1d: 88.0, wind_1d: 6.2, pressure_1d: 1008.5, soil_1d: 0.42, rain_1d: 24.5,
+    temp_3d_mean: 25.8, temp_3d_max: 28.0, temp_3d_min: 23.5, rh_3d_mean: 85.2, rh_3d_min: 74.0, wind_3d_mean: 5.8, wind_3d_max: 9.4, pressure_3d_mean: 1007.8, soil_3d_mean: 0.40, rain_3d_total: 62.0,
+    temp_7d_mean: 25.4, temp_7d_max: 29.1, temp_7d_min: 22.8, rh_7d_mean: 86.8, rh_7d_min: 70.0, wind_7d_mean: 5.4, wind_7d_max: 11.2, pressure_7d_mean: 1008.2, soil_7d_mean: 0.39, rain_7d_total: 135.0
   }
 };
 
-function applyPreset(presetName) {
-  const p = PRESETS[presetName];
+function loadScenario(key) {
+  const p = SCENARIOS[key];
   if (!p) return;
   for (const [k, v] of Object.entries(p)) {
     const el = document.getElementById('in_' + k);
@@ -1241,15 +1594,15 @@ function applyPreset(presetName) {
   }
 }
 
-function resetForm() {
-  document.getElementById('model-form').reset();
+function resetModelInputs() {
+  document.getElementById('model-prediction-form').reset();
 }
 
-// Auto-boot on load
+// Auto-run on load
 window.addEventListener('DOMContentLoaded', () => {
   const activeTab = "{{ active_tab }}";
   if (activeTab === 'live') {
-    loadLiveFires();
+    refreshSurveillanceData();
   }
 });
 </script>
