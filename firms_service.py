@@ -30,7 +30,8 @@ VALID_SOURCES = {
     "VIIRS_NOAA21_NRT": "NOAA-21 VIIRS",
 }
 
-BOUNDARY_PATH = Path("data/processed/india_boundary.geojson")
+BASE_DIR = Path(__file__).resolve().parent
+BOUNDARY_PATH = BASE_DIR / "data" / "processed" / "india_boundary.geojson"
 
 
 class FIRMSService:

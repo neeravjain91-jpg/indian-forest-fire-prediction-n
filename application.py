@@ -13,9 +13,11 @@ from firms_service import BOUNDARY_PATH, FIRMSService
 
 app = Flask(__name__)
 
+BASE_DIR = Path(__file__).resolve().parent
+
 # Paths to the validated, immutable research artifacts
-MODEL_PATH = Path("results/final_model/final_hgb_model.joblib")
-METRICS_PATH = Path("results/final_model/metrics.json")
+MODEL_PATH = BASE_DIR / "results" / "final_model" / "final_hgb_model.joblib"
+METRICS_PATH = BASE_DIR / "results" / "final_model" / "metrics.json"
 
 # Validated 31 features used by the HistGradientBoostingClassifier model
 FEATURES = [

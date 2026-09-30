@@ -1,0 +1,18 @@
+[project]
+name = "indian-forest-fire-prediction"
+version = "0.1.0"
+description = "India Forest Fire Prediction & Live Surveillance System"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "flask>=3.0",
+    "numpy>=1.26",
+    "pandas>=2.2",
+    "scikit-learn>=1.5",
+    "requests>=2.32",
+    "joblib>=1.4",
+    "shapely>=2.0",
+]
+
+[tool.vercel]
+entrypoint = "application:app"
