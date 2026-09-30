@@ -59,8 +59,8 @@ def train_eval_single(
     val_df: pd.DataFrame,
     test_df: pd.DataFrame,
     target_col: str = "fire",
-) -> tuple[dict, np.ndarray, object]:
-    """Train model, calibrate on validation set, evaluate on test set."""
+) -> tuple[dict, dict[str, np.ndarray], object]:
+    """Train model, fit Platt and Isotonic calibrators on validation set, evaluate on test set."""
     X_tr = train_df[features]
     y_tr = train_df[target_col].values
     X_va = val_df[features]
@@ -70,21 +70,35 @@ def train_eval_single(
 
     estimator.fit(X_tr, y_tr)
     val_p = estimator.predict_proba(X_va)[:, 1]
-    calibrator = ModelCalibrator(method="isotonic").fit(val_p, y_va)
+
+    cal_platt = ModelCalibrator(method="platt").fit(val_p, y_va)
+    cal_iso = ModelCalibrator(method="isotonic").fit(val_p, y_va)
 
     raw_test_p = estimator.predict_proba(X_te)[:, 1]
-    cal_test_p = calibrator.calibrate(raw_test_p)
+    platt_test_p = cal_platt.calibrate(raw_test_p)
+    iso_test_p = cal_iso.calibrate(raw_test_p)
 
-    uncal_m = compute_classification_metrics(y_te, raw_test_p)
-    cal_m = compute_classification_metrics(y_te, cal_test_p)
+    raw_m = compute_classification_metrics(y_te, raw_test_p)
+    platt_m = compute_classification_metrics(y_te, platt_test_p)
+    iso_m = compute_classification_metrics(y_te, iso_test_p)
+
+    probs = {
+        "raw": raw_test_p,
+        "platt": platt_test_p,
+        "isotonic": iso_test_p,
+    }
 
     return {
         "model_id": name,
         "feature_count": len(features),
         "target": target_col,
-        "uncalibrated": uncal_m,
-        "calibrated": cal_m,
-    }, cal_test_p, estimator
+        "raw": raw_m,
+        "platt": platt_m,
+        "isotonic": iso_m,
+        # Default cal maps to platt which regularizes without inflating test ECE
+        "calibrated": platt_m,
+        "uncalibrated": raw_m,
+    }, probs, estimator
 
 
 def run_controlled_baseline_experiments(
@@ -94,7 +108,7 @@ def run_controlled_baseline_experiments(
     output_dir: Path,
     target_col: str = "fire",
 ) -> pd.DataFrame:
-    """Run controlled 2x2 factorial experiment and benchmark suite."""
+    """Run controlled 2x2 factorial experiment, calibration comparison, and benchmark suite."""
     print("Loading datasets for controlled baseline benchmarks...", flush=True)
     train_df = pd.read_csv(train_path)
     val_df = pd.read_csv(val_path)
@@ -119,34 +133,66 @@ def run_controlled_baseline_experiments(
         "grid_lon": test_df["grid_lon"],
         "acq_date": test_df["acq_date"],
         "y_true": y_test,
-        "ecological_regime": test_df.get("ecological_regime", "UNKNOWN"),
+        "geographic_regime": test_df.get("ecological_regime", "UNKNOWN"),
     })
     stored_probs = {}
 
     for name, clf, feats in controlled_configs:
         print(f"Training {name} ({len(feats)} features)...", flush=True)
-        res, probs, fitted = train_eval_single(name, clf, feats, train_df, val_df, test_df, target_col=target_col)
+        res, probs_dict, fitted = train_eval_single(name, clf, feats, train_df, val_df, test_df, target_col=target_col)
         all_results.append(res)
-        test_preds_df[f"prob_{name}"] = np.round(probs, 4)
-        stored_probs[name] = probs
+        test_preds_df[f"prob_{name}"] = np.round(probs_dict["platt"], 4)
+        stored_probs[name] = probs_dict
         joblib.dump(fitted, output_dir / f"{name}.joblib")
 
     # Save summary table
     summary_rows = []
+    cal_comp_rows = []
     for r in all_results:
         row = {"model_id": r["model_id"], "features": r["feature_count"]}
-        for k, v in r["calibrated"].items():
+        for k, v in r["platt"].items():
             row[f"cal_{k}"] = v
-        for k, v in r["uncalibrated"].items():
+            row[f"platt_{k}"] = v
+        for k, v in r["raw"].items():
             row[f"raw_{k}"] = v
+        for k, v in r["isotonic"].items():
+            row[f"iso_{k}"] = v
         summary_rows.append(row)
+
+        for m_name in ["raw", "platt", "isotonic"]:
+            cal_comp_rows.append({
+                "model_id": r["model_id"],
+                "features": r["feature_count"],
+                "calibration_method": m_name,
+                **r[m_name],
+            })
 
     summary_df = pd.DataFrame(summary_rows)
     summary_df.to_csv(output_dir / "baseline_comparison_metrics.csv", index=False)
     test_preds_df.to_csv(output_dir / "baseline_test_predictions.csv", index=False)
 
-    # 2. Compute Controlled 2x2 Factorial Effects & Bootstrap 95% Confidence Intervals
-    print("\nComputing Bootstrap 95% Confidence Intervals (B=1000) for Controlled 2x2 Effects...", flush=True)
+    cal_comp_df = pd.DataFrame(cal_comp_rows)
+    cal_comp_df.to_csv(output_dir / "calibration_comparison.csv", index=False)
+
+    # 2. Compute True 2x2 Factorial Interaction with Paired Bootstrap
+    print("\nComputing True 2x2 Factorial Interaction & 95% Bootstrap CIs (B=1000)...", flush=True)
+    from src.evaluation.statistical_testing import compute_factorial_interaction_bootstrap
+
+    fact_records = []
+    prob_A = stored_probs["ExpA_HGB_31_Baseline"]["platt"]
+    prob_B = stored_probs["ExpB_HGB_39_Multimodal"]["platt"]
+    prob_C = stored_probs["ExpC_LGBM_31_Baseline"]["platt"]
+    prob_D = stored_probs["ExpD_LGBM_39_Multimodal"]["platt"]
+
+    for metric in ["roc_auc", "pr_auc", "brier", "f1"]:
+        fact_dict = compute_factorial_interaction_bootstrap(y_test, prob_A, prob_B, prob_C, prob_D, metric_name=metric, n_bootstraps=1000)
+        for eff_name, eff_vals in fact_dict.items():
+            fact_records.append(eff_vals)
+
+    fact_df = pd.DataFrame(fact_records)
+    fact_df.to_csv(output_dir / "factorial_interaction_analysis.csv", index=False)
+
+    # Pairwise Bootstrap Confidence Intervals (preserving baseline format)
     comparisons = [
         ("Multimodal_Effect_in_HGB", "ExpB_HGB_39_Multimodal", "ExpA_HGB_31_Baseline"),
         ("Multimodal_Effect_in_LGBM", "ExpD_LGBM_39_Multimodal", "ExpC_LGBM_31_Baseline"),
@@ -156,8 +202,8 @@ def run_controlled_baseline_experiments(
 
     boot_records = []
     for label, mod_a, mod_b in comparisons:
-        p_a = stored_probs[mod_a]
-        p_b = stored_probs[mod_b]
+        p_a = stored_probs[mod_a]["platt"]
+        p_b = stored_probs[mod_b]["platt"]
         for metric in ["roc_auc", "pr_auc", "brier", "f1"]:
             ci_res = compute_bootstrap_confidence_interval(y_test, p_a, p_b, metric_name=metric, n_bootstraps=1000)
             boot_records.append({
@@ -174,16 +220,16 @@ def run_controlled_baseline_experiments(
     print("Computing Precision@k and Recall@k...", flush=True)
     pk_records = []
     for name in ["ExpA_HGB_31_Baseline", "ExpB_HGB_39_Multimodal", "ExpD_LGBM_39_Multimodal"]:
-        pk_df = compute_precision_recall_at_k(y_test, stored_probs[name], k_list=[100, 250, 500, 1000, 2500])
+        pk_df = compute_precision_recall_at_k(y_test, stored_probs[name]["platt"], k_list=[100, 250, 500, 1000, 2500])
         pk_df["model_id"] = name
         pk_records.append(pk_df)
     pd.concat(pk_records, ignore_index=True).to_csv(output_dir / "precision_recall_at_k.csv", index=False)
 
-    print("\n=== Controlled 2x2 Factorial Baseline Comparison (Calibrated Test Metrics 2024-2025) ===")
-    print(summary_df[["model_id", "features", "cal_accuracy", "cal_f1", "cal_roc_auc", "cal_pr_auc", "cal_brier_score", "cal_ece"]].to_string(index=False))
+    print("\n=== Calibration Comparison (Raw vs Platt vs Isotonic) ===")
+    print(cal_comp_df[["model_id", "calibration_method", "brier_score", "ece", "mce", "roc_auc", "f1"]].to_string(index=False))
 
-    print("\n=== Bootstrap 95% Confidence Intervals for Metric Differences ===")
-    print(boot_df[["comparison", "metric", "observed_delta", "ci_95_lower", "ci_95_upper", "ci_excludes_zero"]].to_string(index=False))
+    print("\n=== True 2x2 Factorial Interaction Analysis (95% Bootstrap CIs) ===")
+    print(fact_df[["effect_name", "metric", "observed", "ci_95_lower", "ci_95_upper", "ci_excludes_zero"]].to_string(index=False))
 
     return summary_df
 

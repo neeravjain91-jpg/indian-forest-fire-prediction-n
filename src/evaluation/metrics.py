@@ -46,6 +46,38 @@ def compute_expected_calibration_error(
     return float(round(ece, 4))
 
 
+def compute_maximum_calibration_error(
+    y_true: np.ndarray,
+    y_prob: np.ndarray,
+    n_bins: int = 10,
+) -> float:
+    """Compute Maximum Calibration Error (MCE) across populated probability bins.
+    
+    MCE = max_{m=1}^M |acc(B_m) - conf(B_m)|
+    """
+    y_t = np.asarray(y_true, dtype=int)
+    y_p = np.clip(np.asarray(y_prob, dtype=float), 0.0, 1.0)
+    if len(y_t) == 0:
+        return 0.0
+
+    bins = np.linspace(0.0, 1.0, n_bins + 1)
+    max_gap = 0.0
+
+    for i in range(n_bins):
+        bin_lower = bins[i]
+        bin_upper = bins[i + 1]
+        mask = (y_p >= bin_lower) & (y_p <= bin_upper if i == n_bins - 1 else y_p < bin_upper)
+        bin_size = np.sum(mask)
+        if bin_size > 0:
+            bin_acc = np.mean(y_t[mask])
+            bin_conf = np.mean(y_p[mask])
+            gap = abs(bin_acc - bin_conf)
+            if gap > max_gap:
+                max_gap = gap
+
+    return float(round(max_gap, 4))
+
+
 def compute_classification_metrics(
     y_true: np.ndarray,
     y_prob: np.ndarray,
@@ -62,6 +94,7 @@ def compute_classification_metrics(
     pr_auc = float(average_precision_score(y_t, y_p)) if has_both_classes else float("nan")
     brier = float(brier_score_loss(y_t, y_p))
     ece = compute_expected_calibration_error(y_t, y_p, n_bins=10)
+    mce = compute_maximum_calibration_error(y_t, y_p, n_bins=10)
 
     return {
         "accuracy": round(float(accuracy_score(y_t, y_pred)), 4),
@@ -72,6 +105,7 @@ def compute_classification_metrics(
         "pr_auc": round(pr_auc, 4),
         "brier_score": round(brier, 4),
         "ece": round(ece, 4),
+        "mce": round(mce, 4),
     }
 
 

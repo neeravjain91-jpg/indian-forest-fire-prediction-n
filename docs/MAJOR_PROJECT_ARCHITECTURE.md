@@ -8,7 +8,7 @@ While the mini-project baseline addressed *"Can we classify fire occurrence give
 1. **Forward Multi-Horizon Forecasting ($T+24\text{h}$, $T+48\text{h}$)**: Predicting fire risk with strictly causal temporal availability.
 2. **Spatiotemporal Event Clusters**: Constructing connected fire complexes ($\text{DBSCAN-ST}$) with tracked duration, perimeters, and centroid trajectories.
 3. **Multimodal Environmental Fusion**: Unifying multi-timescale atmospheric drying (ERA5-Land 1d, 3d, 7d), terrain geomorphology (elevation, slope, ruggedness), atmospheric fuel dryness (VPD, soil moisture draw-down), and antecedent fire persistence.
-4. **Geographic Generalization**: Measuring spatial transfer across distinct Indian ecoregions (e.g., Central Deciduous vs. Western Ghats vs. Northeast).
+4. **Geographic Generalization**: Measuring spatial transfer across distinct predefined geographic fire regimes (e.g., Central Deciduous vs. Western Ghats vs. Northeast).
 5. **Probability Calibration & Epistemic Uncertainty**: Brier score, Expected Calibration Error (ECE), and out-of-distribution (OOD) distance tracking.
 6. **Historical Replay & Spatial Verification**: Retrospective simulation station comparing prospective forecasts against ground-truth satellite observations.
 
@@ -19,8 +19,8 @@ While the mini-project baseline addressed *"Can we classify fire occurrence give
 ```
                                   DATA SOURCES
    ┌────────────────────────┬────────────────────────┬────────────────────────┐
-   │  NASA FIRMS VIIRS 375m │  Copernicus ERA5-Land  │   NASA SRTM 90m DEM    │
-   │  (SNPP, NOAA20, NOAA21)│  (Hourly Reanalysis)   │   (Topography / TRI)   │
+   │  NASA FIRMS VIIRS 375m │  Copernicus ERA5-Land  │   NOAA ETOPO 2022 DEM  │
+   │  (SNPP, NOAA20, NOAA21)│  (Hourly Reanalysis)   │   (incorporating SRTM) │
    └───────────┬────────────┴───────────┬────────────┴───────────┬────────────┘
                │                        │                        │
                ▼                        ▼                        ▼
@@ -63,7 +63,7 @@ While the mini-project baseline addressed *"Can we classify fire occurrence give
  ┌────────────────────────────────────────────────────────────────────────────┐
  │                 RIGOROUS DUAL GENERALIZATION BENCHMARKS                    │
  │ 1. Chronological Test (Train: 2018-2022, Val: 2023, Test: 2024-2025)       │
- │ 2. Spatially Disjoint Holdout (Train: Non-Central Biomes, Test: Central)   │
+ │ 2. Spatially Disjoint Holdout (Train: Non-Central Regimes, Test: Central)   │
  │ 3. Modality Ablation Matrix & Probability Calibration (ECE, Brier)         │
  └──────────────────────────────────────┬─────────────────────────────────────┘
                                         │

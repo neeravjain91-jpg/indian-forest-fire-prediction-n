@@ -118,3 +118,111 @@ def compute_bootstrap_confidence_interval(
         "ci_95_upper": round(ci_upper, 4),
         "ci_excludes_zero": excludes_zero,
     }
+
+
+def compute_factorial_interaction_bootstrap(
+    y_true: np.ndarray,
+    prob_a: np.ndarray,
+    prob_b: np.ndarray,
+    prob_c: np.ndarray,
+    prob_d: np.ndarray,
+    metric_name: str = "roc_auc",
+    n_bootstraps: int = 1000,
+    seed: int = 42,
+) -> dict[str, dict[str, float | bool]]:
+    """Calculate 2x2 factorial effects and interaction via paired bootstrap resampling.
+    
+    Factorial Structure:
+      A = HGB + 31 Baseline
+      B = HGB + 39 Multimodal
+      C = LightGBM + 31 Baseline
+      D = LightGBM + 39 Multimodal
+
+    Quantified Effects:
+      1. feature_effect_hgb: B - A
+      2. feature_effect_lgbm: D - C
+      3. feature_main_effect: ((B - A) + (D - C)) / 2
+      4. model_effect_31: C - A
+      5. model_effect_39: D - B
+      6. model_main_effect: ((C - A) + (D - B)) / 2
+      7. interaction: (D - C) - (B - A)
+    """
+    y_t = np.asarray(y_true, dtype=int)
+    p_a = np.asarray(prob_a, dtype=float)
+    p_b = np.asarray(prob_b, dtype=float)
+    p_c = np.asarray(prob_c, dtype=float)
+    p_d = np.asarray(prob_d, dtype=float)
+    n = len(y_t)
+
+    def calc_metric(y, p):
+        if metric_name == "roc_auc":
+            return roc_auc_score(y, p) if len(np.unique(y)) > 1 else 0.5
+        elif metric_name == "pr_auc":
+            return average_precision_score(y, p) if len(np.unique(y)) > 1 else 0.0
+        elif metric_name == "brier":
+            return brier_score_loss(y, p)
+        elif metric_name == "f1":
+            pred = (p >= 0.5).astype(int)
+            return f1_score(y, pred, zero_division=0)
+        else:
+            raise ValueError(f"Unsupported metric: {metric_name}")
+
+    # Point estimates on observed test set
+    mA = calc_metric(y_t, p_a)
+    mB = calc_metric(y_t, p_b)
+    mC = calc_metric(y_t, p_c)
+    mD = calc_metric(y_t, p_d)
+
+    obs_effects = {
+        "feature_effect_hgb": mB - mA,
+        "feature_effect_lgbm": mD - mC,
+        "feature_main_effect": ((mB - mA) + (mD - mC)) / 2.0,
+        "model_effect_31": mC - mA,
+        "model_effect_39": mD - mB,
+        "model_main_effect": ((mC - mA) + (mD - mB)) / 2.0,
+        "interaction": (mD - mC) - (mB - mA),
+    }
+
+    boot_effects = {k: [] for k in obs_effects}
+    rng = np.random.default_rng(seed)
+
+    for _ in range(n_bootstraps):
+        boot_idx = rng.integers(0, n, size=n)
+        by = y_t[boot_idx]
+        if len(np.unique(by)) < 2:
+            continue
+        bA = calc_metric(by, p_a[boot_idx])
+        bB = calc_metric(by, p_b[boot_idx])
+        bC = calc_metric(by, p_c[boot_idx])
+        bD = calc_metric(by, p_d[boot_idx])
+
+        fe_hgb = bB - bA
+        fe_lgb = bD - bC
+        boot_effects["feature_effect_hgb"].append(fe_hgb)
+        boot_effects["feature_effect_lgbm"].append(fe_lgb)
+        boot_effects["feature_main_effect"].append((fe_hgb + fe_lgb) / 2.0)
+
+        me_31 = bC - bA
+        me_39 = bD - bB
+        boot_effects["model_effect_31"].append(me_31)
+        boot_effects["model_effect_39"].append(me_39)
+        boot_effects["model_main_effect"].append((me_31 + me_39) / 2.0)
+
+        boot_effects["interaction"].append(fe_lgb - fe_hgb)
+
+    summary = {}
+    for eff_name, vals in boot_effects.items():
+        arr = np.array(vals)
+        ci_low = float(np.percentile(arr, 2.5))
+        ci_high = float(np.percentile(arr, 97.5))
+        ex_zero = bool((ci_low > 0 and ci_high > 0) or (ci_low < 0 and ci_high < 0))
+        summary[eff_name] = {
+            "metric": metric_name,
+            "effect_name": eff_name,
+            "observed": round(float(obs_effects[eff_name]), 4),
+            "ci_95_lower": round(ci_low, 4),
+            "ci_95_upper": round(ci_high, 4),
+            "ci_excludes_zero": ex_zero,
+        }
+
+    return summary

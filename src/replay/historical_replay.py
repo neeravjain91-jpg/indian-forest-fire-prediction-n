@@ -64,12 +64,24 @@ class HistoricalReplayEngine:
 
         hits = int(np.sum((y_pred == 1) & (y_true == 1)))
         false_alarms = int(np.sum((y_pred == 1) & (y_true == 0)))
-        misses = int(np.sum((y_pred == 0) & (y_true == 1)))
+        misses_in_candidate = int(np.sum((y_pred == 0) & (y_true == 1)))
         correct_negatives = int(np.sum((y_pred == 0) & (y_true == 0)))
 
-        prec = hits / max(1, hits + false_alarms) if (hits + false_alarms) > 0 else 0.0
-        rec = hits / max(1, hits + misses) if (hits + misses) > 0 else 0.0
-        f1 = (2 * prec * rec) / max(1e-6, prec + rec) if (prec + rec) > 0 else 0.0
+        target_fires_total = len(actual_fire_cells)
+        target_fires_in_candidate = int(np.sum(y_true == 1))
+        misses_outside_candidate = max(0, target_fires_total - target_fires_in_candidate)
+        total_domain_misses = misses_in_candidate + misses_outside_candidate
+
+        # 1. Candidate-Domain Metrics (conditioned on evaluated candidate cells)
+        candidate_prec = hits / max(1, hits + false_alarms) if (hits + false_alarms) > 0 else 0.0
+        candidate_rec = hits / max(1, target_fires_in_candidate) if target_fires_in_candidate > 0 else 0.0
+        candidate_f1 = (2 * candidate_prec * candidate_rec) / max(1e-6, candidate_prec + candidate_rec) if (candidate_prec + candidate_rec) > 0 else 0.0
+
+        # 2. Full Spatial Domain Recall (treating unmonitored target fire cells as misses)
+        full_spatial_rec = hits / max(1, target_fires_total) if target_fires_total > 0 else 0.0
+        full_spatial_f1 = (2 * candidate_prec * full_spatial_rec) / max(1e-6, candidate_prec + full_spatial_rec) if (candidate_prec + full_spatial_rec) > 0 else 0.0
+
+        fpr = false_alarms / max(1, correct_negatives + false_alarms) if (correct_negatives + false_alarms) > 0 else 0.0
 
         active_events = []
         if self.events_df is not None:
@@ -82,15 +94,21 @@ class HistoricalReplayEngine:
         return {
             "forecast_origin_date": t_date.strftime("%Y-%m-%d"),
             "verification_target_date": t_plus_24h.strftime("%Y-%m-%d"),
-            "monitored_cells_count": len(origin_obs),
-            "actual_fire_cells_count": len(actual_fire_cells),
+            "candidate_cells_count": len(origin_obs),
+            "actual_fire_cells_total": target_fires_total,
+            "target_fires_in_candidate": target_fires_in_candidate,
             "forecast_hits": hits,
             "forecast_false_alarms": false_alarms,
-            "forecast_misses": misses,
+            "misses_in_candidate": misses_in_candidate,
+            "misses_outside_candidate": misses_outside_candidate,
+            "total_domain_misses": total_domain_misses,
             "forecast_correct_negatives": correct_negatives,
-            "precision": round(prec, 4),
-            "recall": round(rec, 4),
-            "f1_score": round(f1, 4),
+            "precision": round(candidate_prec, 4),
+            "candidate_domain_recall": round(candidate_rec, 4),
+            "candidate_domain_f1": round(candidate_f1, 4),
+            "full_spatial_recall": round(full_spatial_rec, 4),
+            "full_spatial_f1": round(full_spatial_f1, 4),
+            "false_positive_rate": round(fpr, 4),
             "active_events_count": len(active_events),
             "active_events": active_events,
         }
@@ -119,15 +137,20 @@ class HistoricalReplayEngine:
             results.append({
                 "origin_date": res["forecast_origin_date"],
                 "target_date": res["verification_target_date"],
-                "monitored_cells": res["monitored_cells_count"],
-                "actual_fires": res["actual_fire_cells_count"],
+                "candidate_cells": res["candidate_cells_count"],
+                "actual_fires_total": res["actual_fire_cells_total"],
+                "actual_fires_in_candidate": res["target_fires_in_candidate"],
                 "hits": res["forecast_hits"],
                 "false_alarms": res["forecast_false_alarms"],
-                "misses": res["forecast_misses"],
+                "misses_in_candidate": res["misses_in_candidate"],
+                "misses_outside_candidate": res["misses_outside_candidate"],
+                "total_misses": res["total_domain_misses"],
                 "precision": res["precision"],
-                "recall": res["recall"],
-                "f1_score": res["f1_score"],
-                "active_events": res["active_events_count"],
+                "candidate_recall": res["candidate_domain_recall"],
+                "candidate_f1": res["candidate_domain_f1"],
+                "full_spatial_recall": res["full_spatial_recall"],
+                "full_spatial_f1": res["full_spatial_f1"],
+                "false_positive_rate": res["false_positive_rate"],
             })
 
         bench_df = pd.DataFrame(results)
@@ -136,20 +159,23 @@ class HistoricalReplayEngine:
         macro_summary = {
             "n_dates_evaluated": len(bench_df),
             "macro_precision": round(float(bench_df["precision"].mean()), 4),
-            "macro_recall": round(float(bench_df["recall"].mean()), 4),
-            "macro_f1": round(float(bench_df["f1_score"].mean()), 4),
-            "total_monitored_cells": int(bench_df["monitored_cells"].sum()),
+            "macro_candidate_recall": round(float(bench_df["candidate_recall"].mean()), 4),
+            "macro_candidate_f1": round(float(bench_df["candidate_f1"].mean()), 4),
+            "macro_full_spatial_recall": round(float(bench_df["full_spatial_recall"].mean()), 4),
+            "macro_full_spatial_f1": round(float(bench_df["full_spatial_f1"].mean()), 4),
+            "macro_false_positive_rate": round(float(bench_df["false_positive_rate"].mean()), 4),
+            "total_candidate_cells": int(bench_df["candidate_cells"].sum()),
+            "total_actual_fires": int(bench_df["actual_fires_total"].sum()),
             "total_hits": int(bench_df["hits"].sum()),
             "total_false_alarms": int(bench_df["false_alarms"].sum()),
-            "total_misses": int(bench_df["misses"].sum()),
         }
 
         with open(output_dir / "multi_date_benchmark_summary.json", "w", encoding="utf-8") as f:
             json.dump(macro_summary, f, indent=2)
 
         print("\n=== Multi-Date Historical Replay Benchmark (N=20 Dates in 2024-2025) ===")
-        print(bench_df[["origin_date", "monitored_cells", "hits", "false_alarms", "misses", "precision", "recall", "f1_score"]].to_string(index=False))
-        print(f"\nMacro Averages: Precision={macro_summary['macro_precision']:.2%}, Recall={macro_summary['macro_recall']:.2%}, F1={macro_summary['macro_f1']:.2%}")
+        print(bench_df[["origin_date", "candidate_cells", "hits", "false_alarms", "precision", "candidate_recall", "full_spatial_recall"]].to_string(index=False))
+        print(f"\nMacro Averages: Precision={macro_summary['macro_precision']:.2%}, Candidate-Recall={macro_summary['macro_candidate_recall']:.2%}, Full-Spatial-Recall={macro_summary['macro_full_spatial_recall']:.2%}")
         return bench_df
 
 

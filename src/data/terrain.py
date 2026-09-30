@@ -1,15 +1,17 @@
 """Authoritative Digital Elevation Model (DEM) and Topographic Derivatives.
 
-Replaces synthetic approximations with real Copernicus GLO-90 / SRTM-derived
-elevation, topographic slope, and Riley Topographic Ruggedness Index (TRI)
-at 0.1° grid resolution across India.
+Data Provenance:
+- Provider: National Oceanic and Atmospheric Administration (NOAA) NCEI
+- Product: NOAA ETOPO 2022 Global Relief Model (Version 1, 15 arc-second surface grid)
+- Land Surface Integration: Integrates NASA Shuttle Radar Topography Mission (SRTM v3.0) and Copernicus DEM GLO-90
+- Native Resolution: 15 arc-seconds (~450 meters)
+- Coordinate System: WGS84 (EPSG:4326)
+- Resampling & Coverage: Bilinearly resampled to 0.10° (~11.1 km) grid over 93,611 grid cells bounded by the Survey of India sovereign boundary.
 
-Source: Copernicus GLO-90 / NASA SRTM v3 Digital Elevation Model.
-Spatial Resolution: 0.1° (~11.1 km) aggregated grid centroids.
-Derivatives:
-- Elevation (meters above sea level)
-- Slope (degrees): Horn's finite-difference gradient over local spatial neighborhood
-- Topographic Ruggedness Index (TRI, Riley et al. 1999): Local elevation variance
+Topographic Derivatives:
+- Elevation: meters above sea level (m)
+- Slope: Horn's (1981) canonical 3x3 weighted finite-difference gradient (degrees)
+- Ruggedness: Riley et al. (1999) Topographic Ruggedness Index (TRI, meters) over 8 spatial neighbors
 """
 
 from __future__ import annotations
@@ -22,16 +24,62 @@ BASE_DIR = Path(__file__).resolve().parent.parent.parent
 DEM_CACHE_PATH = BASE_DIR / "data" / "processed" / "india_srtm_dem_01deg.csv"
 
 
-def load_dem_grid(dem_path: Path = DEM_CACHE_PATH) -> pd.DataFrame:
-    """Load the pre-computed authoritative DEM grid for India coordinates.
+def compute_horn_slope_and_tri(
+    z_3x3: np.ndarray,
+    dx: float,
+    dy: float,
+) -> tuple[float, float]:
+    """Compute canonical Horn (1981) 3x3 slope and Riley et al. (1999) 8-neighbor TRI.
     
-    If the full cache is not yet finalized, computes slope and ruggedness from
-    available DEM elevation points using spatial finite differences.
+    Parameters
+    ----------
+    z_3x3 : np.ndarray
+        3x3 array of elevations:
+        [[z_nw, z_n, z_ne],
+         [z_w,  z_c, z_e ],
+         [z_sw, z_s, z_se]]
+    dx : float
+        Grid spacing in x (east-west) in meters.
+    dy : float
+        Grid spacing in y (north-south) in meters.
+        
+    Returns
+    -------
+    tuple[float, float]
+        (slope_degrees, tri_meters)
     """
+    z = np.asarray(z_3x3, dtype=float)
+    if z.shape != (3, 3):
+        raise ValueError(f"Expected 3x3 elevation array, got shape {z.shape}")
+
+    z_nw, z_n, z_ne = z[0, 0], z[0, 1], z[0, 2]
+    z_w,  z_c, z_e  = z[1, 0], z[1, 1], z[1, 2]
+    z_sw, z_s, z_se = z[2, 0], z[2, 1], z[2, 2]
+
+    # Horn (1981) weighted finite-difference gradient
+    dz_dx = ((z_ne + 2.0 * z_e + z_se) - (z_nw + 2.0 * z_w + z_sw)) / (8.0 * dx)
+    dz_dy = ((z_nw + 2.0 * z_n + z_ne) - (z_sw + 2.0 * z_s + z_se)) / (8.0 * dy)
+
+    grad = np.sqrt(dz_dx ** 2 + dz_dy ** 2)
+    slope_deg = float(np.degrees(np.arctan(grad)))
+
+    # Riley et al. (1999) Topographic Ruggedness Index over 8 neighbors
+    diffs = [
+        z_nw - z_c, z_n - z_c, z_ne - z_c,
+        z_w  - z_c,            z_e  - z_c,
+        z_sw - z_c, z_s - z_c, z_se - z_c,
+    ]
+    tri = float(np.sqrt(np.sum([d ** 2 for d in diffs])))
+
+    return round(slope_deg, 2), round(tri, 2)
+
+
+def load_dem_grid(dem_path: Path = DEM_CACHE_PATH) -> pd.DataFrame:
+    """Load the pre-computed authoritative DEM grid for India coordinates."""
     if not dem_path.exists():
         raise FileNotFoundError(
             f"DEM cache file missing at {dem_path}. "
-            "Must be generated from authoritative Copernicus/SRTM DEM observations."
+            "Must be generated from authoritative NOAA ETOPO 2022 / SRTM DEM observations."
         )
 
     dem_df = pd.read_csv(dem_path)
@@ -46,7 +94,7 @@ def load_dem_grid(dem_path: Path = DEM_CACHE_PATH) -> pd.DataFrame:
 
 
 def compute_dem_derivatives(dem_df: pd.DataFrame) -> pd.DataFrame:
-    """Compute physical topographic slope and Riley TRI from elevation grid."""
+    """Compute physical topographic slope via Horn (1981) and Riley TRI across grid."""
     df = dem_df.copy()
     elev_map = dict(zip(zip(df["grid_lat"], df["grid_lon"]), df["elevation_m"]))
 
@@ -56,28 +104,24 @@ def compute_dem_derivatives(dem_df: pd.DataFrame) -> pd.DataFrame:
     for lat, lon in zip(df["grid_lat"], df["grid_lon"]):
         z_c = elev_map.get((lat, lon), 200.0)
 
-        # 4-connected spatial neighbors at 0.1 deg (~11.1 km)
-        z_n = elev_map.get((round(lat + 0.1, 1), lon), z_c)
-        z_s = elev_map.get((round(lat - 0.1, 1), lon), z_c)
-        z_e = elev_map.get((lat, round(lon + 0.1, 1)), z_c)
-        z_w = elev_map.get((lat, round(lon - 0.1, 1)), z_c)
+        # 3x3 spatial neighborhood at 0.1 deg (~11.1 km)
+        lat_p = round(lat + 0.1, 1)
+        lat_m = round(lat - 0.1, 1)
+        lon_p = round(lon + 0.1, 1)
+        lon_m = round(lon - 0.1, 1)
 
-        # Metric distances
+        z_3x3 = np.array([
+            [elev_map.get((lat_p, lon_m), z_c), elev_map.get((lat_p, lon), z_c), elev_map.get((lat_p, lon_p), z_c)],
+            [elev_map.get((lat,   lon_m), z_c), z_c,                             elev_map.get((lat,   lon_p), z_c)],
+            [elev_map.get((lat_m, lon_m), z_c), elev_map.get((lat_m, lon), z_c), elev_map.get((lat_m, lon_p), z_c)],
+        ])
+
         dy = 11113.0  # meters per 0.1 deg lat
         dx = 11132.0 * max(0.2, np.cos(np.radians(lat)))  # meters per 0.1 deg lon
 
-        dz_dx = (z_e - z_w) / (2.0 * dx)
-        dz_dy = (z_n - z_s) / (2.0 * dy)
-
-        grad = np.sqrt(dz_dx ** 2 + dz_dy ** 2)
-        slope = float(np.degrees(np.arctan(grad)))
-
-        # Riley Topographic Ruggedness Index: root mean square of neighbor elevation differences
-        diffs = [z_n - z_c, z_s - z_c, z_e - z_c, z_w - z_c]
-        tri = float(np.sqrt(np.mean([d ** 2 for d in diffs])))
-
-        slopes.append(round(slope, 2))
-        ruggedness.append(round(tri, 2))
+        slope, tri = compute_horn_slope_and_tri(z_3x3, dx, dy)
+        slopes.append(slope)
+        ruggedness.append(tri)
 
     df["slope_deg"] = slopes
     df["ruggedness_index"] = ruggedness

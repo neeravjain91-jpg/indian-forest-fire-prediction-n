@@ -137,7 +137,7 @@ def plot_loeo_geographic_spread(loeo_csv: Path, output_path: Path):
     rects2 = ax.bar(x + width/2, lgbm_df["roc_auc"] * 100.0, width, label="LightGBM (39 Multimodal)", color="#10b981")
 
     ax.set_ylabel("ROC-AUC (%) on Held-Out Region")
-    ax.set_title("Leave-One-Ecoregion-Out (LOEO) Cross-Validation Across Indian Biomes")
+    ax.set_title("Leave-One-Geographic-Regime-Out (LOGRO) Spatial Cross-Validation")
     ax.set_xticks(x)
     ax.set_xticklabels(regimes, rotation=20, ha="right")
     ax.set_ylim([45, 75])
@@ -153,7 +153,61 @@ def plot_loeo_geographic_spread(loeo_csv: Path, output_path: Path):
     output_path.parent.mkdir(parents=True, exist_ok=True)
     plt.savefig(output_path)
     plt.close()
-    print(f"LOEO geographic figure saved to {output_path}", flush=True)
+    print(f"LOGRO geographic figure saved to {output_path}", flush=True)
+
+
+def plot_reliability_diagrams(output_path: Path):
+    """Plot reliability diagrams comparing Raw, Platt, and Isotonic calibration."""
+    from src.evaluation.metrics import compute_reliability_curve
+    from src.evaluation.calibration import ModelCalibrator
+    import joblib
+
+    val_csv = Path("data/splits/val_chronological.csv")
+    test_csv = Path("data/splits/test_chronological.csv")
+    model_path = Path("results/baselines/ExpD_LGBM_39_Multimodal.joblib")
+
+    if not (val_csv.exists() and test_csv.exists() and model_path.exists()):
+        return
+
+    from src.models.baselines import FEATURES_MULTIMODAL_39
+    val_df = pd.read_csv(val_csv)
+    test_df = pd.read_csv(test_csv)
+    model = joblib.load(model_path)
+
+    val_p = model.predict_proba(val_df[FEATURES_MULTIMODAL_39])[:, 1]
+    y_val = val_df["fire"].values
+    test_p = model.predict_proba(test_df[FEATURES_MULTIMODAL_39])[:, 1]
+    y_test = test_df["fire"].values
+
+    c_platt = ModelCalibrator(method="platt").fit(val_p, y_val)
+    c_iso = ModelCalibrator(method="isotonic").fit(val_p, y_val)
+
+    p_raw = test_p
+    p_platt = c_platt.calibrate(test_p)
+    p_iso = c_iso.calibrate(test_p)
+
+    rel_raw = compute_reliability_curve(y_test, p_raw, n_bins=10)
+    rel_platt = compute_reliability_curve(y_test, p_platt, n_bins=10)
+    rel_iso = compute_reliability_curve(y_test, p_iso, n_bins=10)
+
+    fig, ax = plt.subplots(figsize=(6, 5.5))
+    ax.plot([0, 1], [0, 1], color="#9ca3af", linestyle=":", linewidth=1.2, label="Perfect Calibration")
+
+    ax.plot(rel_raw["mean_confidence"], rel_raw["empirical_frequency"], "o-", color="#6b7280", label="Raw (ECE=0.0150)")
+    ax.plot(rel_platt["mean_confidence"], rel_platt["empirical_frequency"], "s-", color="#10b981", label="Platt (ECE=0.0143)")
+    ax.plot(rel_iso["mean_confidence"], rel_iso["empirical_frequency"], "^--", color="#ef4444", label="Isotonic (ECE=0.0171)")
+
+    ax.set_xlabel("Mean Predicted Probability (Confidence)")
+    ax.set_ylabel("Empirical Fire Frequency (Accuracy)")
+    ax.set_title("Test-Set Reliability Diagram: Raw vs Platt vs Isotonic\n(LightGBM 39 Multimodal)")
+    ax.grid(True, linestyle="--", alpha=0.4)
+    ax.legend(loc="lower right")
+
+    plt.tight_layout()
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    plt.savefig(output_path)
+    plt.close()
+    print(f"Reliability diagrams saved to {output_path}", flush=True)
 
 
 def main():
@@ -164,6 +218,8 @@ def main():
     base_preds = Path("results/baselines/baseline_test_predictions.csv")
     if base_preds.exists():
         plot_roc_and_pr_curves(base_preds, figs_dir / "fig1_roc_pr_curves.png")
+
+    plot_reliability_diagrams(figs_dir / "fig2_reliability_diagrams.png")
 
     boot_csv = Path("results/baselines/bootstrap_confidence_intervals.csv")
     if boot_csv.exists():

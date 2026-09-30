@@ -33,6 +33,33 @@ def compute_bearing_deg(lat1: float, lon1: float, lat2: float, lon2: float) -> f
     return round(bearing, 1)
 
 
+def check_event_persistence_linkage(
+    origin_lat: float,
+    origin_lon: float,
+    origin_event_id: str,
+    future_detections: list[dict],
+    max_spatial_km: float = 25.0,
+) -> int:
+    """Evaluate whether an active fire detection at T persists into T+1d.
+    
+    Linkage Criterion:
+      Returns 1 if and only if:
+      1. The origin detection belongs to a valid event cluster (non-empty origin_event_id).
+      2. There exists at least one active detection on calendar day T+1d that:
+         a. Belongs to the identical event cluster (det['event_id'] == origin_event_id), AND
+         b. Resides within great-circle distance <= max_spatial_km (25.0 km) of (origin_lat, origin_lon).
+      Returns 0 otherwise (extinguished, chained cluster bridge >25km away, 2-day gap, or different event).
+    """
+    if not origin_event_id:
+        return 0
+    for det in future_detections:
+        if det.get("event_id") == origin_event_id:
+            dist = haversine_km(origin_lat, origin_lon, det["lat"], det["lon"])
+            if dist <= max_spatial_km:
+                return 1
+    return 0
+
+
 def cluster_fire_events(
     fire_df: pd.DataFrame,
     spatial_radius_km: float = 25.0,

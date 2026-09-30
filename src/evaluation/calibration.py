@@ -11,13 +11,17 @@ from sklearn.preprocessing import StandardScaler
 
 
 class ModelCalibrator:
-    """Post-hoc probability calibrator supporting Platt scaling and Isotonic regression."""
+    """Post-hoc probability calibrator supporting Raw (uncalibrated), Platt scaling, and Isotonic regression."""
 
     def __init__(self, method: str = "isotonic"):
-        self.method = method
+        self.method = method.lower()
         self.model = None
 
     def fit(self, val_probs: np.ndarray, val_labels: np.ndarray) -> "ModelCalibrator":
+        if self.method in ("raw", "none", "uncalibrated"):
+            self.model = None
+            return self
+
         probs = np.clip(np.asarray(val_probs, dtype=float), 1e-6, 1.0 - 1e-6)
         labels = np.asarray(val_labels, dtype=int)
 
@@ -35,7 +39,7 @@ class ModelCalibrator:
 
     def calibrate(self, probs: np.ndarray) -> np.ndarray:
         p = np.clip(np.asarray(probs, dtype=float), 1e-6, 1.0 - 1e-6)
-        if self.model is None:
+        if self.method in ("raw", "none", "uncalibrated") or self.model is None:
             return p
 
         if self.method == "platt":
@@ -44,6 +48,31 @@ class ModelCalibrator:
         elif self.method == "isotonic":
             return self.model.predict(p)
         return p
+
+
+def evaluate_calibration_methods(
+    val_probs: np.ndarray,
+    val_labels: np.ndarray,
+    test_probs: np.ndarray,
+    test_labels: np.ndarray,
+) -> dict[str, dict[str, float]]:
+    """Compare Raw, Platt (Sigmoid), and Isotonic calibration protocols.
+    
+    Fits calibrators exclusively on validation data, and evaluates ECE, MCE,
+    and Brier score loss on untouched test data.
+    """
+    from src.evaluation.metrics import compute_classification_metrics
+
+    methods = ["raw", "platt", "isotonic"]
+    results = {}
+
+    for m in methods:
+        calibrator = ModelCalibrator(method=m).fit(val_probs, val_labels)
+        cal_test_p = calibrator.calibrate(test_probs)
+        metrics = compute_classification_metrics(test_labels, cal_test_p)
+        results[m] = metrics
+
+    return results
 
 
 class UncertaintyEstimator:

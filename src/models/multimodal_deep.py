@@ -1,13 +1,18 @@
-"""Multimodal Spatiotemporal Deep Learning Network with Genuine Recurrent Temporal Encoders.
+"""Multimodal Spatiotemporal Deep Learning Network with Multi-Scale Temporal Feature Encoders.
 
 Architecture:
-1. Temporal Weather Encoder: 2-layer Bidirectional GRU over ordered temporal sequence
-   [t_{-7d}, t_{-3d}, t_{-1d}] of atmospheric drying and wind state.
+1. Multi-Scale Temporal Weather Encoder: 2-layer Bidirectional GRU over ordered temporal multi-scale
+   representation [t_{-7d}, t_{-3d}, t_{-1d}] capturing antecedent atmospheric drying trends.
 2. Topography & Environment Encoder: MLP over authoritative DEM elevation, slope, TRI, and VPD.
 3. Fire History & Spatial Persistence Encoder: MLP over causal recurrence, antecedent fire, coordinates.
 4. Gated Cross-Modality Fusion Layer with Residual Skip Connection.
 5. Multi-Task Heads: Diagnostic Occurrence (T), Forward Lead (T+24h), Connected Event Persistence.
 6. Epistemic Uncertainty via Monte Carlo Dropout with empirical error correlation analysis.
+
+Scientific Note:
+The input sequence consists of ordered multi-scale temporal summaries [7d mean, 3d mean, 1d observation]
+rather than continuous hourly weather trajectories. It functions as a multi-timescale sequential representation
+encoder across synoptic and immediate timescales.
 """
 
 from __future__ import annotations
@@ -39,7 +44,7 @@ HISTORY_COLS = [
 
 
 class TemporalWeatherEncoder(nn.Module):
-    """Bidirectional GRU encoding the ordered multi-timescale sequence [7d, 3d, 1d]."""
+    """Bidirectional GRU encoding the ordered multi-scale sequence [7d, 3d, 1d]."""
 
     def __init__(self, in_features: int = 6, hidden_dim: int = 24, dropout: float = 0.1):
         super().__init__()
