@@ -1,0 +1,80 @@
+[
+  {
+    "ablation_id": "A_Weather_1d_Only",
+    "description": "Instantaneous 1d weather alone",
+    "feature_count": 6,
+    "cal_accuracy": 0.5452,
+    "cal_f1": 0.6251,
+    "cal_roc_auc": 0.5625,
+    "cal_pr_auc": 0.5437,
+    "cal_brier_score": 0.2467,
+    "cal_ece": 0.023,
+    "uncal_roc_auc": 0.5629,
+    "uncal_ece": 0.0087
+  },
+  {
+    "ablation_id": "B_Weather_MultiTimescale",
+    "description": "Multi-timescale (1d + 3d + 7d) atmospheric drying",
+    "feature_count": 26,
+    "cal_accuracy": 0.5531,
+    "cal_f1": 0.6161,
+    "cal_roc_auc": 0.5784,
+    "cal_pr_auc": 0.559,
+    "cal_brier_score": 0.2451,
+    "cal_ece": 0.0198,
+    "uncal_roc_auc": 0.5787,
+    "uncal_ece": 0.0061
+  },
+  {
+    "ablation_id": "C_Weather_Plus_FireHistory",
+    "description": "Weather history + Antecedent persistence",
+    "feature_count": 28,
+    "cal_accuracy": 0.5632,
+    "cal_f1": 0.6304,
+    "cal_roc_auc": 0.5894,
+    "cal_pr_auc": 0.564,
+    "cal_brier_score": 0.2425,
+    "cal_ece": 0.0203,
+    "uncal_roc_auc": 0.5907,
+    "uncal_ece": 0.0082
+  },
+  {
+    "ablation_id": "D_Weather_Plus_Terrain_Env",
+    "description": "Weather history + Terrain geomorphology & VPD",
+    "feature_count": 32,
+    "cal_accuracy": 0.554,
+    "cal_f1": 0.6218,
+    "cal_roc_auc": 0.5798,
+    "cal_pr_auc": 0.5581,
+    "cal_brier_score": 0.2447,
+    "cal_ece": 0.0224,
+    "uncal_roc_auc": 0.5806,
+    "uncal_ece": 0.0071
+  },
+  {
+    "ablation_id": "E_Full_Multimodal",
+    "description": "Full multimodal integration (39 features)",
+    "feature_count": 39,
+    "cal_accuracy": 0.5712,
+    "cal_f1": 0.597,
+    "cal_roc_auc": 0.6047,
+    "cal_pr_auc": 0.5804,
+    "cal_brier_score": 0.24,
+    "cal_ece": 0.0136,
+    "uncal_roc_auc": 0.6053,
+    "uncal_ece": 0.0107
+  },
+  {
+    "ablation_id": "F_Full_Multimodal_Uncalibrated",
+    "description": "Full multimodal model without post-hoc probability calibration",
+    "feature_count": 39,
+    "cal_accuracy": 0.5695,
+    "cal_f1": 0.5871,
+    "cal_roc_auc": 0.6053,
+    "cal_pr_auc": 0.5867,
+    "cal_brier_score": 0.2399,
+    "cal_ece": 0.0107,
+    "uncal_roc_auc": 0.6053,
+    "uncal_ece": 0.0107
+  }
+]

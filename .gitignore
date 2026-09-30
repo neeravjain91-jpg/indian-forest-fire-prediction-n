@@ -9,6 +9,18 @@ venv/
 
 # Cache / temporary files
 /cache/
+.pytest_cache/
 
 # Python temporary/model files
 *.pkl
+
+# Intermediate split data and multimodal derived features (prevent git repo bloat)
+data/events/
+data/features/
+data/splits/
+data/interim/
+data/raw/
+
+# Exclude auxiliary bulky model checkpoints (final HGB model in results/final_model is preserved)
+results/baselines/*.joblib
+results/multimodal/*.pt

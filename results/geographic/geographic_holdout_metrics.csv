@@ -1,0 +1,5 @@
+model,feature_set,train_regimes,test_regime,n_train,n_test,accuracy,f1,roc_auc,pr_auc,brier_score,ece,uncal_roc_auc,uncal_ece
+LightGBM_Multimodal,39_multimodal,"NON_CENTRAL (North, NE, West, East, NW)",CENTRAL (Deccan Dry Deciduous),71199,47397,0.5649,0.6434,0.5941,0.5658,0.242,0.0174,0.5954,0.0121
+Random_Forest_Multimodal,39_multimodal,"NON_CENTRAL (North, NE, West, East, NW)",CENTRAL (Deccan Dry Deciduous),71199,47397,0.5493,0.6655,0.5877,0.564,0.2428,0.0092,0.5888,0.0062
+HGB_Mini_Baseline,31_baseline,"NON_CENTRAL (North, NE, West, East, NW)",CENTRAL (Deccan Dry Deciduous),71199,47397,0.5572,0.629,0.5834,0.5595,0.2442,0.0211,0.5842,0.0164
+Logistic_Regression_Baseline,31_baseline,"NON_CENTRAL (North, NE, West, East, NW)",CENTRAL (Deccan Dry Deciduous),71199,47397,0.5501,0.6178,0.5761,0.5573,0.245,0.0169,0.5766,0.0141

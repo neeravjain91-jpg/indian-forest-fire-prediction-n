@@ -1,5 +1,12 @@
 # Large training dataset (65MB - not needed for runtime prediction or live surveillance)
 data/processed/india_fire_weather_final.csv
+data/events/
+data/features/
+data/splits/
+
+# Large model binaries not used by production app
+results/baselines/
+results/multimodal/
 
 # Data ingestion & preparation scripts
 download_era5_land*.py
@@ -8,8 +15,11 @@ build_dataset.py
 train_and_evaluate.py
 train_final_model.py
 
-# Research & development docs
+# Research & development docs, tests, and artifacts
 research/
+tests/
+docs/
+reports/
 .git/
 .venv/
 venv/

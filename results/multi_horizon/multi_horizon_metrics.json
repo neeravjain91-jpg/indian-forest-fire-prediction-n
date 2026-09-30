@@ -1,0 +1,58 @@
+[
+  {
+    "horizon": "Occurrence_T",
+    "target_variable": "fire",
+    "description": "Instantaneous detection reference at time T",
+    "positive_rate_test": 0.5,
+    "cal_accuracy": 0.5698,
+    "cal_f1": 0.6055,
+    "cal_roc_auc": 0.6031,
+    "cal_pr_auc": 0.5779,
+    "cal_brier_score": 0.2403,
+    "cal_ece": 0.0166,
+    "raw_roc_auc": 0.6039,
+    "raw_ece": 0.0114
+  },
+  {
+    "horizon": "Forward_T_plus_24h",
+    "target_variable": "target_fire_lead_24h",
+    "description": "Next-day 24h forward forecast",
+    "positive_rate_test": 0.0232,
+    "cal_accuracy": 0.9768,
+    "cal_f1": 0.0,
+    "cal_roc_auc": 0.5335,
+    "cal_pr_auc": 0.0252,
+    "cal_brier_score": 0.0227,
+    "cal_ece": 0.0026,
+    "raw_roc_auc": 0.5342,
+    "raw_ece": 0.0021
+  },
+  {
+    "horizon": "Forward_T_plus_48h",
+    "target_variable": "target_fire_lead_48h",
+    "description": "Two-day 48h forward forecast",
+    "positive_rate_test": 0.0258,
+    "cal_accuracy": 0.9742,
+    "cal_f1": 0.0,
+    "cal_roc_auc": 0.5458,
+    "cal_pr_auc": 0.0297,
+    "cal_brier_score": 0.0252,
+    "cal_ece": 0.0003,
+    "raw_roc_auc": 0.5438,
+    "raw_ece": 0.0045
+  },
+  {
+    "horizon": "Event_Persistence_24h",
+    "target_variable": "target_event_persistence",
+    "description": "Active complex continuation into T+24h",
+    "positive_rate_test": 0.0057,
+    "cal_accuracy": 0.9943,
+    "cal_f1": 0.0,
+    "cal_roc_auc": 0.623,
+    "cal_pr_auc": 0.0084,
+    "cal_brier_score": 0.0057,
+    "cal_ece": 0.0008,
+    "raw_roc_auc": 0.6316,
+    "raw_ece": 0.0024
+  }
+]

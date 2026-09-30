@@ -1,0 +1,5 @@
+horizon,target_variable,description,positive_rate_test,cal_accuracy,cal_f1,cal_roc_auc,cal_pr_auc,cal_brier_score,cal_ece,raw_roc_auc,raw_ece
+Occurrence_T,fire,Instantaneous detection reference at time T,0.5,0.5698,0.6055,0.6031,0.5779,0.2403,0.0166,0.6039,0.0114
+Forward_T_plus_24h,target_fire_lead_24h,Next-day 24h forward forecast,0.0232,0.9768,0.0,0.5335,0.0252,0.0227,0.0026,0.5342,0.0021
+Forward_T_plus_48h,target_fire_lead_48h,Two-day 48h forward forecast,0.0258,0.9742,0.0,0.5458,0.0297,0.0252,0.0003,0.5438,0.0045
+Event_Persistence_24h,target_event_persistence,Active complex continuation into T+24h,0.0057,0.9943,0.0,0.623,0.0084,0.0057,0.0008,0.6316,0.0024

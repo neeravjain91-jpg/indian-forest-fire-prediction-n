@@ -6,45 +6,55 @@ One observation is a 0.1° latitude/longitude grid cell at a specific UTC hour a
 
 ## Primary temporal protocol
 
-- Train: 2018–2023
-- Validation: 2024
-- Final test: 2025
+- Train: 2018–2022 (84,661 observations)
+- Validation: 2023 (14,814 observations)
+- Final Test: 2024–2025 (31,525 observations)
+- Total: 131,000 observations (65,518 fire, 65,482 non-fire)
 
-The 2025 test set is never used for feature selection, threshold selection, hyperparameter tuning, or model selection.
+The 2024–2025 held-out test set is never used for feature engineering, threshold tuning, or model selection.
 
 ## Spatial protocol
 
-Observations are assigned to 2° geographic blocks. Blocks, not individual rows, are randomly divided into train/test groups. This prevents neighboring grid cells from being scattered across both sets.
+Observations are referenced to 0.1° grid cells (~11 km) across sovereign India (26,494 unique spatial cells). Spatial generalization is evaluated across geographic regions and holdout blocks to prevent spatial autocorrelation leakage.
+
+## Model and Feature Specification
+
+31 predictive features spanning multi-timescale atmospheric and spatiotemporal dimensions:
+- Spatial (2): `grid_lat`, `grid_lon`
+- Temporal (3): `hour`, `year`, `month`
+- 1-day Weather (6): `temp_1d`, `rh_1d`, `wind_1d`, `pressure_1d`, `soil_1d`, `rain_1d`
+- 3-day Weather (10): `temp_3d_mean`, `temp_3d_max`, `temp_3d_min`, `rh_3d_mean`, `rh_3d_min`, `wind_3d_mean`, `wind_3d_max`, `pressure_3d_mean`, `soil_3d_mean`, `rain_3d_total`
+- 7-day Weather (10): `temp_7d_mean`, `temp_7d_max`, `temp_7d_min`, `rh_7d_mean`, `rh_7d_min`, `wind_7d_mean`, `wind_7d_max`, `pressure_7d_mean`, `soil_7d_mean`, `rain_7d_total`
+
+Primary Classifier:
+- `HistGradientBoostingClassifier` (max_iter=300, learning_rate=0.05, max_leaf_nodes=31, l2_regularization=1.0, random_state=42)
 
 ## Metrics
 
-Because fire occurrence is a rare-event problem, the primary metrics are:
-
-- PR-AUC
+Because fire occurrence is an imbalanced spatial classification problem, comprehensive discrimination and ranking metrics are reported:
 - ROC-AUC
-- F1
-- precision
-- recall
-- Brier score
+- PR-AUC
+- F1-Score
+- Precision
+- Recall
+- Accuracy
+- Confusion Matrix
 
-Accuracy is not a primary metric.
+## Baselines & Ablations
 
-## Ablation
+1. Model Comparison:
+   - Logistic Regression (with StandardScaler)
+   - Random Forest
+   - HistGradientBoostingClassifier (Primary Model)
 
-The following feature sets are compared:
+2. Spatiotemporal & Meteorological Ablations:
+   - Full 31 features
+   - Coordinates + Temporal (5 features)
+   - Coordinates + Weather (28 features)
+   - Weather Only (26 features)
+   - Coordinates Only (2 features)
+   - Temporal Only (3 features)
 
-1. Instantaneous meteorology.
-2. Instantaneous + 24 h summaries.
-3. Instantaneous + 24/72/168 h rainfall history.
-4. Full multiscale meteorology.
-
-## Baselines
-
-- Logistic Regression
-- Random Forest
-- Gradient Boosting
-
-These establish whether the observed research effect is robust across conventional model families.
 
 ## Leakage controls
 
