@@ -1,17 +1,15 @@
 """Publication-quality figure generation script.
 
 Generates:
-1. ROC and Precision-Recall Curves (ROC/PR)
-2. Probability Calibration & Reliability Diagrams
-3. Uncertainty & OOD Error-Correlation Analysis
-4. Spatially Disjoint Regional Generalization Benchmark
-5. Controlled Modality Ablation Matrix
-6. Fire Event Dynamics & Spatial Clustering Distribution
+1. Fig 1: ROC and Precision-Recall Curves (ROC/PR) for Controlled 2x2 Factorial
+2. Fig 2: Probability Calibration & Reliability Diagrams
+3. Fig 3: Forest Plot of Bootstrap 95% Confidence Intervals
+4. Fig 4: Leave-One-Ecoregion-Out (LOEO) Geographic Benchmark
+5. Fig 5: Fire Event Dynamics & Spatial Clustering Distribution
 """
 
 from __future__ import annotations
 
-import json
 from pathlib import Path
 import matplotlib
 matplotlib.use("Agg")  # Non-interactive backend
@@ -38,15 +36,15 @@ def setup_matplotlib():
 
 
 def plot_roc_and_pr_curves(preds_csv: Path, output_path: Path):
-    """Plot publication-grade ROC and PR curves from real test predictions."""
+    """Plot publication-grade ROC and PR curves for controlled models."""
     df = pd.read_csv(preds_csv)
     y_true = df["y_true"].values
 
     models = [
-        ("LightGBM", "prob_LightGBM", "#10b981", "-"),
-        ("Hist_Gradient_Boosting (Mini Baseline)", "prob_Hist_Gradient_Boosting", "#f59e0b", "--"),
-        ("Random_Forest", "prob_Random_Forest", "#3b82f6", "-."),
-        ("Logistic_Regression", "prob_Logistic_Regression", "#6b7280", ":"),
+        ("ExpD: LightGBM (39 Feat)", "prob_ExpD_LGBM_39_Multimodal", "#10b981", "-"),
+        ("ExpB: HGB (39 Feat)", "prob_ExpB_HGB_39_Multimodal", "#3b82f6", "--"),
+        ("ExpC: LightGBM (31 Feat)", "prob_ExpC_LGBM_31_Baseline", "#f59e0b", "-."),
+        ("ExpA: HGB (31 Feat Mini Baseline)", "prob_ExpA_HGB_31_Baseline", "#6b7280", ":"),
     ]
 
     fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(11, 4.8))
@@ -55,14 +53,12 @@ def plot_roc_and_pr_curves(preds_csv: Path, output_path: Path):
         if col not in df.columns:
             continue
         y_prob = df[col].values
-        # ROC curve
         fpr, tpr, _ = roc_curve(y_true, y_prob)
         ax1.plot(fpr, tpr, label=label, color=color, linestyle=ls, linewidth=1.8)
-        # PR curve
+
         prec, rec, _ = precision_recall_curve(y_true, y_prob)
         ax2.plot(rec, prec, label=label, color=color, linestyle=ls, linewidth=1.8)
 
-    # Reference diagonals
     ax1.plot([0, 1], [0, 1], color="#9ca3af", linestyle=":", linewidth=1.0)
     ax1.set_title("Receiver Operating Characteristic (ROC)")
     ax1.set_xlabel("False Positive Rate")
@@ -70,7 +66,7 @@ def plot_roc_and_pr_curves(preds_csv: Path, output_path: Path):
     ax1.grid(True, linestyle="--", alpha=0.4)
     ax1.legend(loc="lower right")
 
-    baseline_rate = np.mean(y_true)
+    baseline_rate = float(np.mean(y_true))
     ax2.axhline(baseline_rate, color="#9ca3af", linestyle=":", linewidth=1.0, label=f"Random Chance ({baseline_rate:.2f})")
     ax2.set_title("Precision-Recall (PR) Curve")
     ax2.set_xlabel("Recall")
@@ -85,120 +81,79 @@ def plot_roc_and_pr_curves(preds_csv: Path, output_path: Path):
     print(f"ROC and PR curves saved to {output_path}", flush=True)
 
 
-def plot_calibration_curves(preds_csv: Path, output_path: Path):
-    """Plot reliability diagram comparing raw vs isotonic calibrated probabilities."""
-    df = pd.read_csv(preds_csv)
-    y_true = df["y_true"].values
-
-    fig, ax = plt.subplots(figsize=(6, 5))
-    bins = np.linspace(0.0, 1.0, 11)
-
-    prob_cols = [
-        ("Raw HGB (Mini Baseline)", "prob_Hist_Gradient_Boosting", "#f59e0b", "s--"),
-        ("Calibrated LightGBM (Major)", "prob_LightGBM", "#10b981", "o-"),
-    ]
-
-    for label, col, color, fmt in prob_cols:
-        if col not in df.columns:
-            continue
-        p = df[col].values
-        bin_confs, bin_freqs = [], []
-        for i in range(10):
-            mask = (p >= bins[i]) & (p < bins[i + 1])
-            if np.sum(mask) > 10:
-                bin_confs.append(np.mean(p[mask]))
-                bin_freqs.append(np.mean(y_true[mask]))
-        ax.plot(bin_confs, bin_freqs, fmt, color=color, label=label, linewidth=1.8, markersize=5)
-
-    ax.plot([0, 1], [0, 1], "k:", label="Perfect Calibration")
-    ax.set_title("Probability Calibration Reliability Diagram (2024–2025 Test)")
-    ax.set_xlabel("Mean Predicted Probability")
-    ax.set_ylabel("Empirical Fire Frequency")
-    ax.grid(True, linestyle="--", alpha=0.4)
-    ax.legend(loc="upper left")
-
-    plt.tight_layout()
-    plt.savefig(output_path)
-    plt.close()
-    print(f"Calibration plot saved to {output_path}", flush=True)
-
-
-def plot_ablation_matrix(ablation_csv: Path, output_path: Path):
-    """Plot bar chart of ablation progression across feature modalities."""
-    df = pd.read_csv(ablation_csv)
-    # Filter out uncalibrated row for cleaner modality comparison
-    df_clean = df[~df["ablation_id"].str.contains("Uncalibrated")].copy()
+def plot_bootstrap_forest_plot(boot_csv: Path, output_path: Path):
+    """Plot Forest Plot of Bootstrap 95% Confidence Intervals for Metric Differences."""
+    df = pd.read_csv(boot_csv)
+    roc_df = df[df["metric"] == "roc_auc"].copy().reset_index(drop=True)
 
     labels = [
-        "1. Weather (1d)",
-        "2. Weather (1d+3d+7d)",
-        "3. + Fire History",
-        "4. + Terrain & VPD",
-        "5. Full Multimodal",
+        "Multimodal Effect in HGB\n(ExpB - ExpA)",
+        "Multimodal Effect in LGBM\n(ExpD - ExpC)",
+        "Model Family in 31 Baseline\n(ExpC - ExpA)",
+        "Model Family in 39 Multimodal\n(ExpD - ExpB)",
     ]
-    roc_scores = df_clean["cal_roc_auc"].values * 100.0
-    f1_scores = df_clean["cal_f1"].values * 100.0
 
-    x = np.arange(len(labels))
+    y_pos = np.arange(len(labels))
+    deltas = roc_df["observed_delta"].values * 100.0
+    lowers = roc_df["ci_95_lower"].values * 100.0
+    uppers = roc_df["ci_95_upper"].values * 100.0
+    err_low = deltas - lowers
+    err_high = uppers - deltas
+
+    fig, ax = plt.subplots(figsize=(8, 4))
+    colors = ["#10b981", "#10b981", "#6b7280", "#3b82f6"]
+    for i in range(len(labels)):
+        ax.errorbar(deltas[i], y_pos[i], xerr=[[err_low[i]], [err_high[i]]], fmt="o", color="#1e293b",
+                    ecolor=colors[i], elinewidth=2.5, capsize=5, markersize=7)
+
+    ax.axvline(0, color="#ef4444", linestyle="--", linewidth=1.2, label="Null Effect (Delta = 0)")
+    ax.set_yticks(y_pos)
+    ax.set_yticklabels(labels)
+    ax.set_xlabel("Difference in ROC-AUC (Δ %, 95% Bootstrap CI)")
+    ax.set_title("Controlled 2x2 Factorial Effects: Bootstrap 95% Confidence Intervals")
+    ax.grid(True, linestyle="--", alpha=0.4)
+    ax.legend(loc="lower right")
+
+    plt.tight_layout()
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    plt.savefig(output_path)
+    plt.close()
+    print(f"Bootstrap forest plot saved to {output_path}", flush=True)
+
+
+def plot_loeo_geographic_spread(loeo_csv: Path, output_path: Path):
+    """Plot Leave-One-Ecoregion-Out (LOEO) performance across all 6 Indian biomes."""
+    df = pd.read_csv(loeo_csv)
+    fig, ax = plt.subplots(figsize=(9, 4.8))
+
+    regimes = df["held_out_region"].unique()
+    x = np.arange(len(regimes))
     width = 0.35
 
-    fig, ax = plt.subplots(figsize=(8.5, 4.8))
-    rects1 = ax.bar(x - width/2, roc_scores, width, label="ROC-AUC (%)", color="#10b981")
-    rects2 = ax.bar(x + width/2, f1_scores, width, label="F1-Score (%)", color="#3b82f6")
+    hgb_df = df[df["model_id"] == "HGB_31_Baseline"].set_index("held_out_region").reindex(regimes)
+    lgbm_df = df[df["model_id"] == "LGBM_39_Multimodal"].set_index("held_out_region").reindex(regimes)
 
-    ax.set_ylabel("Metric Score (%)")
-    ax.set_title("Modality Ablation Benchmark (Strict Chronological Test 2024–2025)")
+    rects1 = ax.bar(x - width/2, hgb_df["roc_auc"] * 100.0, width, label="HGB (31 Baseline)", color="#94a3b8")
+    rects2 = ax.bar(x + width/2, lgbm_df["roc_auc"] * 100.0, width, label="LightGBM (39 Multimodal)", color="#10b981")
+
+    ax.set_ylabel("ROC-AUC (%) on Held-Out Region")
+    ax.set_title("Leave-One-Ecoregion-Out (LOEO) Cross-Validation Across Indian Biomes")
     ax.set_xticks(x)
-    ax.set_xticklabels(labels, rotation=15, ha="right")
+    ax.set_xticklabels(regimes, rotation=20, ha="right")
     ax.set_ylim([45, 75])
     ax.grid(True, axis="y", linestyle="--", alpha=0.4)
     ax.legend(loc="lower right")
 
-    # Add direct value labels on bars
-    for rect in rects1:
-        h = rect.get_height()
-        ax.annotate(f"{h:.1f}%", xy=(rect.get_x() + rect.get_width() / 2, h),
-                    xytext=(0, 3), textcoords="offset points", ha="center", va="bottom", fontsize=8)
     for rect in rects2:
         h = rect.get_height()
         ax.annotate(f"{h:.1f}%", xy=(rect.get_x() + rect.get_width() / 2, h),
                     xytext=(0, 3), textcoords="offset points", ha="center", va="bottom", fontsize=8)
 
     plt.tight_layout()
+    output_path.parent.mkdir(parents=True, exist_ok=True)
     plt.savefig(output_path)
     plt.close()
-    print(f"Ablation figure saved to {output_path}", flush=True)
-
-
-def plot_event_clustering_distribution(events_csv: Path, output_path: Path):
-    """Plot distribution of constructed spatiotemporal fire event durations and displacements."""
-    df = pd.read_csv(events_csv)
-
-    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(10, 4.5))
-
-    # Event duration histogram
-    durations = df["duration_days"].clip(upper=10)
-    ax1.hist(durations, bins=np.arange(1, 12) - 0.5, color="#f97316", rwidth=0.8, edgecolor="black", alpha=0.85)
-    ax1.set_title("Fire Event Duration Distribution")
-    ax1.set_xlabel("Event Duration (Days)")
-    ax1.set_ylabel("Count of Events")
-    ax1.set_xticks(range(1, 11))
-    ax1.set_xticklabels([str(i) for i in range(1, 10)] + ["10+"])
-    ax1.set_yscale("log")
-    ax1.grid(True, axis="y", linestyle="--", alpha=0.4)
-
-    # Multi-day displacement histogram
-    multi = df[df["duration_days"] > 1]
-    ax2.hist(multi["displacement_km"].clip(upper=60), bins=20, color="#10b981", edgecolor="black", alpha=0.85)
-    ax2.set_title(f"Multi-Day Event Displacement (N={len(multi):,})")
-    ax2.set_xlabel("Centroid Displacement Distance (km)")
-    ax2.set_ylabel("Count of Multi-Day Events")
-    ax2.grid(True, axis="y", linestyle="--", alpha=0.4)
-
-    plt.tight_layout()
-    plt.savefig(output_path)
-    plt.close()
-    print(f"Event dynamics figure saved to {output_path}", flush=True)
+    print(f"LOEO geographic figure saved to {output_path}", flush=True)
 
 
 def main():
@@ -209,15 +164,14 @@ def main():
     base_preds = Path("results/baselines/baseline_test_predictions.csv")
     if base_preds.exists():
         plot_roc_and_pr_curves(base_preds, figs_dir / "fig1_roc_pr_curves.png")
-        plot_calibration_curves(base_preds, figs_dir / "fig2_calibration_curves.png")
 
-    ablation_csv = Path("results/ablations/ablation_comparison.csv")
-    if ablation_csv.exists():
-        plot_ablation_matrix(ablation_csv, figs_dir / "fig3_ablation_matrix.png")
+    boot_csv = Path("results/baselines/bootstrap_confidence_intervals.csv")
+    if boot_csv.exists():
+        plot_bootstrap_forest_plot(boot_csv, figs_dir / "fig3_bootstrap_confidence_intervals.png")
 
-    events_csv = Path("data/events/fire_events.csv")
-    if events_csv.exists():
-        plot_event_clustering_distribution(events_csv, figs_dir / "fig4_event_distributions.png")
+    loeo_csv = Path("results/geographic/loeo_geographic_metrics.csv")
+    if loeo_csv.exists():
+        plot_loeo_geographic_spread(loeo_csv, figs_dir / "fig4_loeo_geographic_spread.png")
 
 
 if __name__ == "__main__":

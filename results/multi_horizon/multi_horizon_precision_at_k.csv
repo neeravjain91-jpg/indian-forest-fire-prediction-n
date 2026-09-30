@@ -1,0 +1,17 @@
+k,hits,total_positives,precision_at_k,recall_at_k,horizon
+100,87,15764,0.87,0.0055,Occurrence_T
+250,201,15764,0.804,0.0128,Occurrence_T
+500,400,15764,0.8,0.0254,Occurrence_T
+1000,767,15764,0.767,0.0487,Occurrence_T
+100,7,732,0.07,0.0096,Forward_T_plus_24h
+250,13,732,0.052,0.0178,Forward_T_plus_24h
+500,21,732,0.042,0.0287,Forward_T_plus_24h
+1000,34,732,0.034,0.0464,Forward_T_plus_24h
+100,3,814,0.03,0.0037,Forward_T_plus_48h
+250,8,814,0.032,0.0098,Forward_T_plus_48h
+500,13,814,0.026,0.016,Forward_T_plus_48h
+1000,37,814,0.037,0.0455,Forward_T_plus_48h
+100,18,2166,0.18,0.0083,Event_Persistence_24h
+250,37,2166,0.148,0.0171,Event_Persistence_24h
+500,68,2166,0.136,0.0314,Event_Persistence_24h
+1000,158,2166,0.158,0.0729,Event_Persistence_24h

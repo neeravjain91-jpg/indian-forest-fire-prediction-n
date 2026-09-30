@@ -1,10 +1,12 @@
-"""Multi-Horizon Forecasting and Event Evolution Evaluation.
+"""Multi-Horizon Forecasting & Event Evolution Evaluation with Precision@k.
 
 Evaluates predictive performance across defensible forecast horizons:
-1. T (Synchronous baseline)
-2. T+24h (Next-Day Forward Forecast)
-3. T+48h (Two-Day Forward Forecast)
-4. Event Persistence (Local active complex continuation into T+24h)
+1. Occurrence_T (Synchronous reference)
+2. Forward_T_plus_24h (Next-Day Forward Forecast)
+3. Forward_T_plus_48h (Two-Day Forward Forecast)
+4. Event_Persistence_24h (Connected complex continuation into T+24h)
+
+Includes Precision@k and Recall@k analysis for rare-event forward targets.
 """
 
 from __future__ import annotations
@@ -18,6 +20,7 @@ from lightgbm import LGBMClassifier
 
 from src.evaluation.calibration import ModelCalibrator
 from src.evaluation.metrics import compute_classification_metrics
+from src.evaluation.statistical_testing import compute_precision_recall_at_k
 from src.models.baselines import FEATURES_MULTIMODAL_39
 
 
@@ -28,7 +31,7 @@ def evaluate_multi_horizon(
     output_dir: Path,
 ) -> pd.DataFrame:
     """Train and evaluate forward-looking multi-horizon models."""
-    print(f"Loading datasets for multi-horizon evaluation...", flush=True)
+    print("Loading datasets for multi-horizon evaluation...", flush=True)
     train_df = pd.read_csv(train_path)
     val_df = pd.read_csv(val_path)
     test_df = pd.read_csv(test_path)
@@ -39,14 +42,14 @@ def evaluate_multi_horizon(
         ("Occurrence_T", "fire", "Instantaneous detection reference at time T"),
         ("Forward_T_plus_24h", "target_fire_lead_24h", "Next-day 24h forward forecast"),
         ("Forward_T_plus_48h", "target_fire_lead_48h", "Two-day 48h forward forecast"),
-        ("Event_Persistence_24h", "target_event_persistence", "Active complex continuation into T+24h"),
+        ("Event_Persistence_24h", "target_event_persistence", "Active connected complex continuation into T+24h"),
     ]
 
     records = []
+    pk_records = []
 
     for name, target_col, desc in horizons:
         if target_col not in train_df.columns:
-            print(f"Skipping {name}: target column {target_col} not found.", flush=True)
             continue
 
         print(f"\n--- Training Horizon: {name} (Target: {target_col}) ---", flush=True)
@@ -54,12 +57,12 @@ def evaluate_multi_horizon(
         y_val = val_df[target_col].values
         y_test = test_df[target_col].values
 
-        pos_rate_tr = np.mean(y_train)
-        pos_rate_te = np.mean(y_test)
+        pos_rate_tr = float(np.mean(y_train))
+        pos_rate_te = float(np.mean(y_test))
         print(f"Train positive rate: {pos_rate_tr:.2%}, Test positive rate: {pos_rate_te:.2%}", flush=True)
 
         clf = LGBMClassifier(
-            n_estimators=250,
+            n_estimators=300,
             learning_rate=0.05,
             num_leaves=31,
             random_state=42,
@@ -77,11 +80,16 @@ def evaluate_multi_horizon(
         uncal_m = compute_classification_metrics(y_test, raw_probs)
         cal_m = compute_classification_metrics(y_test, cal_probs)
 
+        # Precision@k for forward targets
+        pk_df = compute_precision_recall_at_k(y_test, cal_probs, k_list=[100, 250, 500, 1000])
+        pk_df["horizon"] = name
+        pk_records.append(pk_df)
+
         records.append({
             "horizon": name,
             "target_variable": target_col,
             "description": desc,
-            "positive_rate_test": round(float(pos_rate_te), 4),
+            "positive_rate_test": round(pos_rate_te, 4),
             "cal_accuracy": cal_m["accuracy"],
             "cal_f1": cal_m["f1"],
             "cal_roc_auc": cal_m["roc_auc"],
@@ -94,12 +102,16 @@ def evaluate_multi_horizon(
 
     summary_df = pd.DataFrame(records)
     summary_df.to_csv(output_dir / "multi_horizon_comparison.csv", index=False)
-    
-    with open(output_dir / "multi_horizon_metrics.json", "w", encoding="utf-8") as f:
-        json.dump(records, f, indent=2)
+
+    all_pk_df = pd.concat(pk_records, ignore_index=True)
+    all_pk_df.to_csv(output_dir / "multi_horizon_precision_at_k.csv", index=False)
 
     print("\n=== Multi-Horizon Forecasting Evaluation Summary ===")
     print(summary_df[["horizon", "positive_rate_test", "cal_accuracy", "cal_f1", "cal_roc_auc", "cal_pr_auc", "cal_brier_score", "cal_ece"]].to_string(index=False))
+
+    print("\n=== Multi-Horizon Precision@k for Rare-Event Targets ===")
+    print(all_pk_df.to_string(index=False))
+
     return summary_df
 
 

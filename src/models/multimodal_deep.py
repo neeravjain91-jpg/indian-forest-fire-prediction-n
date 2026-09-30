@@ -1,11 +1,13 @@
-"""Multimodal Spatiotemporal Deep Learning Network for Wildfire Forecasting.
+"""Multimodal Spatiotemporal Deep Learning Network with Genuine Recurrent Temporal Encoders.
 
-Implements modular neural branches for:
-1. Atmospheric & Multi-timescale Meteorology
-2. Topography & Environmental Fuel Dryness
-3. Fire History & Spatiotemporal Persistence
-Fused via Gated Representation with Multi-Task Heads (Occurrence, Lead-24h, Persistence)
-and Monte Carlo Dropout Epistemic Uncertainty Estimation.
+Architecture:
+1. Temporal Weather Encoder: 2-layer Bidirectional GRU over ordered temporal sequence
+   [t_{-7d}, t_{-3d}, t_{-1d}] of atmospheric drying and wind state.
+2. Topography & Environment Encoder: MLP over authoritative DEM elevation, slope, TRI, and VPD.
+3. Fire History & Spatial Persistence Encoder: MLP over causal recurrence, antecedent fire, coordinates.
+4. Gated Cross-Modality Fusion Layer with Residual Skip Connection.
+5. Multi-Task Heads: Diagnostic Occurrence (T), Forward Lead (T+24h), Connected Event Persistence.
+6. Epistemic Uncertainty via Monte Carlo Dropout with empirical error correlation analysis.
 """
 
 from __future__ import annotations
@@ -15,6 +17,7 @@ import json
 from pathlib import Path
 import numpy as np
 import pandas as pd
+from scipy.stats import spearmanr
 import torch
 import torch.nn as nn
 import torch.optim as optim
@@ -23,15 +26,7 @@ from torch.utils.data import DataLoader, TensorDataset
 from src.evaluation.calibration import ModelCalibrator, UncertaintyEstimator
 from src.evaluation.metrics import compute_classification_metrics
 
-# Modality Feature Definitions
-WEATHER_COLS = [
-    "temp_1d", "rh_1d", "wind_1d", "pressure_1d", "soil_1d", "rain_1d",
-    "temp_3d_mean", "temp_3d_max", "temp_3d_min", "rh_3d_mean", "rh_3d_min",
-    "wind_3d_mean", "wind_3d_max", "pressure_3d_mean", "soil_3d_mean", "rain_3d_total",
-    "temp_7d_mean", "temp_7d_max", "temp_7d_min", "rh_7d_mean", "rh_7d_min",
-    "wind_7d_mean", "wind_7d_max", "pressure_7d_mean", "soil_7d_mean", "rain_7d_total",
-]
-
+# Modality Column Definitions
 ENV_TERRAIN_COLS = [
     "elevation_m", "slope_deg", "ruggedness_index",
     "vpd_1d", "vpd_3d_mean", "soil_drought_index",
@@ -43,8 +38,31 @@ HISTORY_COLS = [
 ]
 
 
-class ModalityBranch(nn.Module):
-    """Feedforward encoder branch with LayerNorm and GELU activations."""
+class TemporalWeatherEncoder(nn.Module):
+    """Bidirectional GRU encoding the ordered multi-timescale sequence [7d, 3d, 1d]."""
+
+    def __init__(self, in_features: int = 6, hidden_dim: int = 24, dropout: float = 0.1):
+        super().__init__()
+        self.gru = nn.GRU(
+            input_size=in_features,
+            hidden_size=hidden_dim,
+            num_layers=2,
+            batch_first=True,
+            bidirectional=True,
+            dropout=dropout if dropout > 0 else 0.0,
+        )
+        self.layer_norm = nn.LayerNorm(hidden_dim * 2)
+
+    def forward(self, x_seq: torch.Tensor) -> torch.Tensor:
+        # x_seq shape: (batch_size, 3, 6)
+        out, _ = self.gru(x_seq)
+        # Take the final temporal representation
+        last_step = out[:, -1, :]
+        return self.layer_norm(last_step)
+
+
+class StaticBranch(nn.Module):
+    """Feedforward encoder for static terrain and fire history features."""
 
     def __init__(self, in_features: int, hidden_dim: int, out_dim: int, dropout: float = 0.1):
         super().__init__()
@@ -61,21 +79,21 @@ class ModalityBranch(nn.Module):
         return self.net(x)
 
 
-class MultimodalFireNet(nn.Module):
-    """Multimodal Spatiotemporal Deep Neural Network for Wildfire Forecasting."""
+class SpatiotemporalMultimodalFireNet(nn.Module):
+    """Deep Spatiotemporal Multimodal Network for Wildfire Forecasting."""
 
     def __init__(self, dropout: float = 0.15):
         super().__init__()
-        # 1. Weather Branch (26 -> 32)
-        self.weather_branch = ModalityBranch(len(WEATHER_COLS), 64, 32, dropout=dropout)
+        # 1. Temporal Weather Encoder (BiGRU: 3x6 -> 48)
+        self.weather_encoder = TemporalWeatherEncoder(in_features=6, hidden_dim=24, dropout=dropout)
         
-        # 2. Environment & Terrain Branch (6 -> 16)
-        self.env_branch = ModalityBranch(len(ENV_TERRAIN_COLS), 32, 16, dropout=dropout)
+        # 2. Real DEM Terrain & Environment Encoder (6 -> 16)
+        self.env_encoder = StaticBranch(len(ENV_TERRAIN_COLS), 32, 16, dropout=dropout)
         
-        # 3. Fire History & Persistence Branch (5 -> 16)
-        self.history_branch = ModalityBranch(len(HISTORY_COLS), 32, 16, dropout=dropout)
+        # 3. Fire History Encoder (5 -> 16)
+        self.history_encoder = StaticBranch(len(HISTORY_COLS), 32, 16, dropout=dropout)
 
-        fusion_dim = 32 + 16 + 16  # 64 dimensions
+        fusion_dim = 48 + 16 + 16  # 80 dimensions
 
         # Gated Cross-Modality Fusion Layer
         self.fusion = nn.Sequential(
@@ -108,16 +126,16 @@ class MultimodalFireNet(nn.Module):
 
     def forward(
         self,
-        x_weather: torch.Tensor,
+        x_weather_seq: torch.Tensor,
         x_env: torch.Tensor,
         x_history: torch.Tensor,
     ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
-        h_w = self.weather_branch(x_weather)
-        h_e = self.env_branch(x_env)
-        h_h = self.history_branch(x_history)
+        h_w = self.weather_encoder(x_weather_seq)
+        h_e = self.env_encoder(x_env)
+        h_h = self.history_encoder(x_history)
 
         fused = torch.cat([h_w, h_e, h_h], dim=1)
-        latent = self.fusion(fused) + fused  # Residual skip connection
+        latent = self.fusion(fused) + fused
 
         logits_occ = self.head_occurrence(latent).squeeze(-1)
         logits_lead24 = self.head_lead24h(latent).squeeze(-1)
@@ -126,66 +144,85 @@ class MultimodalFireNet(nn.Module):
         return logits_occ, logits_lead24, logits_pers
 
 
-def extract_tensors(df: pd.DataFrame) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
-    """Extract and convert dataframe subsets into torch float tensors."""
-    w = torch.tensor(df[WEATHER_COLS].values, dtype=torch.float32)
-    e = torch.tensor(df[ENV_TERRAIN_COLS].values, dtype=torch.float32)
-    h = torch.tensor(df[HISTORY_COLS].values, dtype=torch.float32)
-    return w, e, h
+def build_weather_sequences(df: pd.DataFrame) -> torch.Tensor:
+    """Build ordered 3-step temporal sequence tensor: [7d, 3d, 1d]."""
+    # Step 1: 7-day antecedent
+    s7 = df[["temp_7d_mean", "rh_7d_mean", "wind_7d_mean", "pressure_7d_mean", "soil_7d_mean", "rain_7d_total"]].copy()
+    s7["rain_7d_total"] /= 7.0
+    
+    # Step 2: 3-day intermediate
+    s3 = df[["temp_3d_mean", "rh_3d_mean", "wind_3d_mean", "pressure_3d_mean", "soil_3d_mean", "rain_3d_total"]].copy()
+    s3["rain_3d_total"] /= 3.0
+    
+    # Step 3: 1-day instantaneous
+    s1 = df[["temp_1d", "rh_1d", "wind_1d", "pressure_1d", "soil_1d", "rain_1d"]].copy()
+
+    # Stack along time dimension: shape (N, 3, 6)
+    arr7 = s7.values[:, np.newaxis, :]
+    arr3 = s3.values[:, np.newaxis, :]
+    arr1 = s1.values[:, np.newaxis, :]
+    seq = np.concatenate([arr7, arr3, arr1], axis=1)
+    return torch.tensor(seq, dtype=torch.float32)
 
 
-def train_multimodal_model(
+def train_temporal_multimodal_model(
     train_path: Path,
     val_path: Path,
     test_path: Path,
     output_dir: Path,
-    epochs: int = 25,
+    epochs: int = 20,
     batch_size: int = 256,
     lr: float = 1e-3,
 ) -> dict:
-    """Train the multimodal deep network, perform calibration and MC-dropout evaluation."""
-    print("Loading datasets for multimodal training...", flush=True)
+    """Train temporal BiGRU multimodal network with MC Dropout and uncertainty correlation."""
+    print("Loading datasets for temporal multimodal deep model...", flush=True)
     train_df = pd.read_csv(train_path)
     val_df = pd.read_csv(val_path)
     test_df = pd.read_csv(test_path)
 
     output_dir.mkdir(parents=True, exist_ok=True)
 
-    # Prepare inputs
-    w_train, e_train, h_train = extract_tensors(train_df)
+    # Build sequence and static inputs
+    w_train_seq = build_weather_sequences(train_df)
+    e_train = torch.tensor(train_df[ENV_TERRAIN_COLS].values, dtype=torch.float32)
+    h_train = torch.tensor(train_df[HISTORY_COLS].values, dtype=torch.float32)
     y_train = torch.tensor(train_df["fire"].values, dtype=torch.float32)
-    y_lead24_train = torch.tensor(train_df.get("target_fire_lead_24h", train_df["fire"]).values, dtype=torch.float32)
-    y_pers_train = torch.tensor(train_df.get("target_event_persistence", train_df["fire"]).values, dtype=torch.float32)
+    y_lead_train = torch.tensor(train_df["target_fire_lead_24h"].values, dtype=torch.float32)
+    y_pers_train = torch.tensor(train_df["target_event_persistence"].values, dtype=torch.float32)
 
-    w_val, e_val, h_val = extract_tensors(val_df)
+    w_val_seq = build_weather_sequences(val_df)
+    e_val = torch.tensor(val_df[ENV_TERRAIN_COLS].values, dtype=torch.float32)
+    h_val = torch.tensor(val_df[HISTORY_COLS].values, dtype=torch.float32)
     y_val = torch.tensor(val_df["fire"].values, dtype=torch.float32)
 
-    w_test, e_test, h_test = extract_tensors(test_df)
+    w_test_seq = build_weather_sequences(test_df)
+    e_test = torch.tensor(test_df[ENV_TERRAIN_COLS].values, dtype=torch.float32)
+    h_test = torch.tensor(test_df[HISTORY_COLS].values, dtype=torch.float32)
     y_test = test_df["fire"].values
 
-    train_dataset = TensorDataset(w_train, e_train, h_train, y_train, y_lead24_train, y_pers_train)
+    train_dataset = TensorDataset(w_train_seq, e_train, h_train, y_train, y_lead_train, y_pers_train)
     train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    print(f"Training MultimodalFireNet on device: {device}", flush=True)
+    print(f"Training SpatiotemporalMultimodalFireNet on device: {device}", flush=True)
 
-    model = MultimodalFireNet(dropout=0.15).to(device)
+    model = SpatiotemporalMultimodalFireNet(dropout=0.15).to(device)
     optimizer = optim.AdamW(model.parameters(), lr=lr, weight_decay=1e-4)
     bce = nn.BCEWithLogitsLoss()
 
     best_val_loss = float("inf")
-    best_weights_path = output_dir / "multimodal_best_weights.pt"
+    best_weights_path = output_dir / "temporal_multimodal_best_weights.pt"
 
     for epoch in range(1, epochs + 1):
         model.train()
         total_loss = 0.0
 
-        for bw, be, bh, by, by_lead, by_pers in train_loader:
-            bw, be, bh = bw.to(device), be.to(device), bh.to(device)
+        for bw_seq, be, bh, by, by_lead, by_pers in train_loader:
+            bw_seq, be, bh = bw_seq.to(device), be.to(device), bh.to(device)
             by, by_lead, by_pers = by.to(device), by_lead.to(device), by_pers.to(device)
 
             optimizer.zero_grad()
-            l_occ, l_lead, l_pers = model(bw, be, bh)
+            l_occ, l_lead, l_pers = model(bw_seq, be, bh)
 
             loss = bce(l_occ, by) + 0.5 * bce(l_lead, by_lead) + 0.5 * bce(l_pers, by_pers)
             loss.backward()
@@ -197,7 +234,7 @@ def train_multimodal_model(
         # Validation step
         model.eval()
         with torch.no_grad():
-            vw, ve, vh = w_val.to(device), e_val.to(device), h_val.to(device)
+            vw, ve, vh = w_val_seq.to(device), e_val.to(device), h_val.to(device)
             vl_occ, _, _ = model(vw, ve, vh)
             val_loss = bce(vl_occ, y_val.to(device)).item()
 
@@ -208,65 +245,74 @@ def train_multimodal_model(
         if epoch % 5 == 0 or epoch == epochs:
             print(f"Epoch {epoch:02d}/{epochs:02d} | Train Loss: {train_loss:.4f} | Val Loss: {val_loss:.4f}", flush=True)
 
-    # Load best model weights
+    # Load best weights
     model.load_state_dict(torch.load(best_weights_path, weights_only=True))
     model.eval()
 
-    # Fit calibration on validation set
+    # Isotonic calibration on validation predictions
     with torch.no_grad():
-        val_probs = torch.sigmoid(model(w_val.to(device), e_val.to(device), h_val.to(device))[0]).cpu().numpy()
-    calibrator = ModelCalibrator(method="isotonic")
-    calibrator.fit(val_probs, val_df["fire"].values)
+        val_probs = torch.sigmoid(model(w_val_seq.to(device), e_val.to(device), h_val.to(device))[0]).cpu().numpy()
+    calibrator = ModelCalibrator(method="isotonic").fit(val_probs, val_df["fire"].values)
 
-    # Test evaluation with Monte Carlo Dropout for Epistemic Uncertainty
+    # Monte Carlo Dropout for Epistemic Uncertainty
     print("Evaluating test predictions with Monte Carlo Dropout...", flush=True)
     def enable_dropout(m):
-        if type(m) == nn.Dropout:
+        if type(m) in (nn.Dropout, nn.GRU):
             m.train()
 
     model.apply(enable_dropout)
     mc_samples = 15
     mc_preds = []
 
-    tw, te, th = w_test.to(device), e_test.to(device), h_test.to(device)
+    tw, te, th = w_test_seq.to(device), e_test.to(device), h_test.to(device)
     with torch.no_grad():
         for _ in range(mc_samples):
             p = torch.sigmoid(model(tw, te, th)[0]).cpu().numpy()
             mc_preds.append(p)
 
-    mc_preds = np.array(mc_preds)  # shape: (mc_samples, n_test)
+    mc_preds = np.array(mc_preds)
     raw_mean_prob = np.mean(mc_preds, axis=0)
-    epistemic_std = np.std(mc_preds, axis=0)  # Epistemic predictive variance
+    epistemic_std = np.std(mc_preds, axis=0)
     calibrated_prob = calibrator.calibrate(raw_mean_prob)
 
-    # Distance-to-support OOD evaluation
-    all_features = WEATHER_COLS + ENV_TERRAIN_COLS + HISTORY_COLS
-    ood_estimator = UncertaintyEstimator().fit(train_df[all_features].values)
-    ood_scores = ood_estimator.compute_ood_distance(test_df[all_features].values)
+    # Evaluate correlation between epistemic uncertainty and empirical error
+    empirical_error = np.abs(y_test - calibrated_prob)
+    spearman_corr, spearman_pval = spearmanr(epistemic_std, empirical_error)
 
-    # Uncertainty error correlation
-    unc_corr_df = ood_estimator.evaluate_uncertainty_error_correlation(
-        y_test, calibrated_prob, ood_scores
-    )
-    unc_corr_df.to_csv(output_dir / "uncertainty_error_correlation.csv", index=False)
+    # Quantile analysis
+    unc_df = pd.DataFrame({
+        "y_true": y_test,
+        "prob": calibrated_prob,
+        "epistemic_std": epistemic_std,
+        "error": empirical_error,
+    })
+    unc_df["unc_quantile"] = pd.qcut(unc_df["epistemic_std"], q=5, labels=["Q1_Low", "Q2", "Q3", "Q4", "Q5_High"])
+    quantile_summary = unc_df.groupby("unc_quantile", observed=False).agg(
+        sample_count=("error", "count"),
+        mean_uncertainty=("epistemic_std", "mean"),
+        mean_error=("error", "mean"),
+    ).reset_index()
 
-    uncal_metrics = compute_classification_metrics(y_test, raw_mean_prob)
-    cal_metrics = compute_classification_metrics(y_test, calibrated_prob)
+    quantile_summary.to_csv(output_dir / "uncertainty_quantile_validation.csv", index=False)
+
+    uncal_m = compute_classification_metrics(y_test, raw_mean_prob)
+    cal_m = compute_classification_metrics(y_test, calibrated_prob)
 
     results = {
-        "model": "Multimodal_Spatiotemporal_Deep_Net",
+        "model": "SpatiotemporalMultimodalFireNet_BiGRU",
         "n_train": len(train_df),
         "n_test": len(test_df),
-        "uncalibrated": uncal_metrics,
-        "calibrated": cal_metrics,
+        "uncalibrated": uncal_m,
+        "calibrated": cal_m,
         "mean_epistemic_std": float(round(np.mean(epistemic_std), 4)),
-        "mean_ood_score": float(round(np.mean(ood_scores), 4)),
+        "spearman_corr_uncertainty_error": float(round(spearman_corr, 4)),
+        "spearman_pval": float(spearman_pval),
     }
 
-    with open(output_dir / "multimodal_metrics.json", "w", encoding="utf-8") as f:
+    with open(output_dir / "temporal_multimodal_metrics.json", "w", encoding="utf-8") as f:
         json.dump(results, f, indent=2)
 
-    # Save test predictions with uncertainty fields
+    # Save predictions
     preds_df = pd.DataFrame({
         "grid_lat": test_df["grid_lat"],
         "grid_lon": test_df["grid_lon"],
@@ -275,19 +321,18 @@ def train_multimodal_model(
         "prob_raw": np.round(raw_mean_prob, 4),
         "prob_calibrated": np.round(calibrated_prob, 4),
         "epistemic_uncertainty": np.round(epistemic_std, 4),
-        "ood_score": np.round(ood_scores, 4),
         "ecological_regime": test_df.get("ecological_regime", "UNKNOWN"),
     })
-    preds_df.to_csv(output_dir / "multimodal_test_predictions.csv", index=False)
+    preds_df.to_csv(output_dir / "temporal_multimodal_test_predictions.csv", index=False)
 
-    print("\n=== Multimodal Deep Net (Calibrated Test Metrics on 2024-2025) ===")
-    print(f"Accuracy:    {cal_metrics['accuracy']:.4f}")
-    print(f"F1 Score:    {cal_metrics['f1']:.4f}")
-    print(f"ROC-AUC:     {cal_metrics['roc_auc']:.4f}")
-    print(f"PR-AUC:      {cal_metrics['pr_auc']:.4f}")
-    print(f"Brier Score: {cal_metrics['brier_score']:.4f}")
-    print(f"ECE:         {cal_metrics['ece']:.4f}")
-    print(f"Mean Epistemic Uncertainty: {results['mean_epistemic_std']:.4f}")
+    print("\n=== Temporal BiGRU Multimodal Model (Calibrated Test Metrics 2024-2025) ===")
+    print(f"Accuracy:    {cal_m['accuracy']:.4f}")
+    print(f"F1 Score:    {cal_m['f1']:.4f}")
+    print(f"ROC-AUC:     {cal_m['roc_auc']:.4f}")
+    print(f"PR-AUC:      {cal_m['pr_auc']:.4f}")
+    print(f"Brier Score: {cal_m['brier_score']:.4f}")
+    print(f"ECE:         {cal_m['ece']:.4f}")
+    print(f"Uncertainty-Error Spearman r: {spearman_corr:.4f} (p = {spearman_pval:.2e})")
 
     return results
 
@@ -301,7 +346,7 @@ def main() -> None:
     p.add_argument("--epochs", type=int, default=20)
     args = p.parse_args()
 
-    train_multimodal_model(
+    train_temporal_multimodal_model(
         Path(args.train),
         Path(args.val),
         Path(args.test),

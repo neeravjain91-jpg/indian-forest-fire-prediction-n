@@ -1,8 +1,14 @@
-"""Geographic & Ecological Generalization Evaluation.
+"""Leave-One-Ecoregion-Out (LOEO) Spatial Cross-Validation.
 
-Stress-tests models across spatially disjoint ecoregions:
-Trains on non-Central India biomes (83k+ samples) and evaluates on the
-held-out Central Deciduous / Deccan Plateau biome (47k+ samples).
+Stress-tests geographic generalizability across all 6 distinct Indian ecoregions:
+1. CENTRAL (Deccan dry deciduous teak/sal belt)
+2. WESTERN_GHATS (Moist evergreen & montane forest)
+3. NORTHEAST (Subtropical Indo-Burma biodiversity hotspot)
+4. NORTH (Western Himalayas and Siwalik pine forests)
+5. EAST (Eastern Ghats & Chota Nagpur plateau)
+6. NORTHWEST (Semi-arid Aravalli and thorn scrub)
+
+Reports individual holdout metrics and Mean ± Spread across all biomes.
 """
 
 from __future__ import annotations
@@ -13,104 +19,109 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 from lightgbm import LGBMClassifier
-from sklearn.ensemble import HistGradientBoostingClassifier, RandomForestClassifier
-from sklearn.linear_model import LogisticRegression
-from sklearn.pipeline import Pipeline
-from sklearn.preprocessing import StandardScaler
+from sklearn.ensemble import HistGradientBoostingClassifier
 
 from src.evaluation.calibration import ModelCalibrator
 from src.evaluation.metrics import compute_classification_metrics
 from src.models.baselines import FEATURES_BASELINE_31, FEATURES_MULTIMODAL_39
 
+REGIMES = ["CENTRAL", "WESTERN_GHATS", "NORTHEAST", "NORTH", "EAST", "NORTHWEST"]
 
-def run_geographic_generalization(
-    train_path: Path,
-    test_path: Path,
+
+def run_loeo_generalization(
+    splits_dir: Path,
     output_dir: Path,
     target_col: str = "fire",
 ) -> pd.DataFrame:
-    """Run spatially disjoint evaluation and measure transfer degradation."""
-    print(f"Loading spatial splits: Train={train_path}, Test={test_path}...", flush=True)
-    train_df = pd.read_csv(train_path)
-    test_df = pd.read_csv(test_path)
-
-    # Use 80/20 train/val split inside the training region for calibration
-    val_sample_mask = np.random.default_rng(42).random(len(train_df)) < 0.15
-    train_part = train_df[~val_sample_mask]
-    val_part = train_df[val_sample_mask]
-
+    """Run full Leave-One-Ecoregion-Out cross-validation across all 6 biomes."""
     output_dir.mkdir(parents=True, exist_ok=True)
-
-    models_config = [
-        ("Logistic_Regression_Baseline", Pipeline([("scaler", StandardScaler()), ("clf", LogisticRegression(max_iter=1000, random_state=42))]), FEATURES_BASELINE_31),
-        ("HGB_Mini_Baseline", HistGradientBoostingClassifier(max_iter=300, learning_rate=0.05, l2_regularization=1.0, random_state=42), FEATURES_BASELINE_31),
-        ("LightGBM_Multimodal", LGBMClassifier(n_estimators=300, learning_rate=0.05, num_leaves=31, random_state=42, n_jobs=-1, verbose=-1), FEATURES_MULTIMODAL_39),
-        ("Random_Forest_Multimodal", RandomForestClassifier(n_estimators=100, max_depth=16, random_state=42, n_jobs=-1), FEATURES_MULTIMODAL_39),
-    ]
-
     records = []
 
-    for name, estimator, features in models_config:
-        print(f"Running geographic holdout test for {name} ({len(features)} features)...", flush=True)
-        X_tr = train_part[features]
-        y_tr = train_part[target_col].values
-        X_va = val_part[features]
-        y_va = val_part[target_col].values
-        X_te = test_df[features]
-        y_te = test_df[target_col].values
+    for held_out in REGIMES:
+        train_file = splits_dir / f"train_loeo_exclude_{held_out.lower()}.csv"
+        test_file = splits_dir / f"test_loeo_holdout_{held_out.lower()}.csv"
 
-        estimator.fit(X_tr, y_tr)
+        if not train_file.exists() or not test_file.exists():
+            print(f"Skipping {held_out}: split files not found.", flush=True)
+            continue
 
-        # Calibrate on validation split from training ecoregions
-        val_probs = estimator.predict_proba(X_va)[:, 1]
-        calibrator = ModelCalibrator(method="isotonic").fit(val_probs, y_va)
+        print(f"\n--- LOEO Fold: Evaluating Held-Out {held_out} ---", flush=True)
+        train_df = pd.read_csv(train_file)
+        test_df = pd.read_csv(test_file)
 
-        raw_test_probs = estimator.predict_proba(X_te)[:, 1]
-        cal_test_probs = calibrator.calibrate(raw_test_probs)
+        y_train = train_df[target_col].values
+        y_test = test_df[target_col].values
 
-        uncal_m = compute_classification_metrics(y_te, raw_test_probs)
-        cal_m = compute_classification_metrics(y_te, cal_test_probs)
+        # Validation split (15%) for isotonic calibration
+        val_mask = np.random.default_rng(42).random(len(train_df)) < 0.15
+        tr_sub = train_df[~val_mask]
+        va_sub = train_df[val_mask]
 
-        records.append({
-            "model": name,
-            "feature_set": "31_baseline" if len(features) == 31 else "39_multimodal",
-            "train_regimes": "NON_CENTRAL (North, NE, West, East, NW)",
-            "test_regime": "CENTRAL (Deccan Dry Deciduous)",
-            "n_train": len(train_part),
-            "n_test": len(test_df),
-            "accuracy": cal_m["accuracy"],
-            "f1": cal_m["f1"],
-            "roc_auc": cal_m["roc_auc"],
-            "pr_auc": cal_m["pr_auc"],
-            "brier_score": cal_m["brier_score"],
-            "ece": cal_m["ece"],
-            "uncal_roc_auc": uncal_m["roc_auc"],
-            "uncal_ece": uncal_m["ece"],
-        })
+        models = [
+            ("HGB_31_Baseline", HistGradientBoostingClassifier(max_iter=300, learning_rate=0.05, l2_regularization=1.0, random_state=42), FEATURES_BASELINE_31),
+            ("LGBM_39_Multimodal", LGBMClassifier(n_estimators=300, learning_rate=0.05, num_leaves=31, random_state=42, n_jobs=-1, verbose=-1), FEATURES_MULTIMODAL_39),
+        ]
 
-    summary_df = pd.DataFrame(records).sort_values("roc_auc", ascending=False)
-    summary_df.to_csv(output_dir / "geographic_holdout_metrics.csv", index=False)
-    
-    with open(output_dir / "geographic_holdout_metrics.json", "w", encoding="utf-8") as f:
-        json.dump(records, f, indent=2)
+        for mod_name, clf, feats in models:
+            clf.fit(tr_sub[feats], tr_sub[target_col].values)
+            val_p = clf.predict_proba(va_sub[feats])[:, 1]
+            calibrator = ModelCalibrator(method="isotonic").fit(val_p, va_sub[target_col].values)
 
-    print("\n=== Spatially Disjoint Geographic Holdout Results (Central India Test) ===")
-    print(summary_df[["model", "feature_set", "accuracy", "f1", "roc_auc", "pr_auc", "brier_score", "ece"]].to_string(index=False))
+            raw_p = clf.predict_proba(test_df[feats])[:, 1]
+            cal_p = calibrator.calibrate(raw_p)
+
+            m = compute_classification_metrics(y_test, cal_p)
+            records.append({
+                "held_out_region": held_out,
+                "model_id": mod_name,
+                "feature_count": len(feats),
+                "n_train": len(tr_sub),
+                "n_test": len(test_df),
+                "test_fire_rate": round(float(np.mean(y_test)), 4),
+                "accuracy": m["accuracy"],
+                "f1": m["f1"],
+                "roc_auc": m["roc_auc"],
+                "pr_auc": m["pr_auc"],
+                "brier_score": m["brier_score"],
+                "ece": m["ece"],
+            })
+
+    summary_df = pd.DataFrame(records)
+    summary_df.to_csv(output_dir / "loeo_geographic_metrics.csv", index=False)
+
+    # Compute Aggregate Mean ± Std across regions
+    agg_df = summary_df.groupby("model_id").agg(
+        mean_roc_auc=("roc_auc", "mean"),
+        std_roc_auc=("roc_auc", "std"),
+        mean_pr_auc=("pr_auc", "mean"),
+        std_pr_auc=("pr_auc", "std"),
+        mean_f1=("f1", "mean"),
+        std_f1=("f1", "std"),
+        mean_brier=("brier_score", "mean"),
+        mean_ece=("ece", "mean"),
+    ).reset_index()
+
+    for col in ["mean_roc_auc", "std_roc_auc", "mean_pr_auc", "std_pr_auc", "mean_f1", "std_f1", "mean_brier", "mean_ece"]:
+        agg_df[col] = agg_df[col].round(4)
+
+    agg_df.to_csv(output_dir / "loeo_aggregate_summary.csv", index=False)
+
+    print("\n=== Leave-One-Ecoregion-Out (LOEO) Geographic Results Summary ===")
+    print(summary_df[["held_out_region", "model_id", "accuracy", "f1", "roc_auc", "pr_auc", "brier_score", "ece"]].to_string(index=False))
+
+    print("\n=== Cross-Regional Macro Mean ± Standard Deviation ===")
+    print(agg_df.to_string(index=False))
+
     return summary_df
 
 
 def main() -> None:
     p = argparse.ArgumentParser()
-    p.add_argument("--train", default="data/splits/train_spatial_non_central.csv")
-    p.add_argument("--test", default="data/splits/test_spatial_central.csv")
+    p.add_argument("--splits-dir", default="data/splits")
     p.add_argument("--output-dir", default="results/geographic")
     args = p.parse_args()
 
-    run_geographic_generalization(
-        Path(args.train),
-        Path(args.test),
-        Path(args.output_dir),
-    )
+    run_loeo_generalization(Path(args.splits_dir), Path(args.output_dir))
 
 
 if __name__ == "__main__":

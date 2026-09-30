@@ -1,11 +1,14 @@
-"""Comprehensive baseline modeling suite for India wildfire forward forecasting.
+"""Controlled Baseline Modeling & 2x2 Multimodal Factorial Benchmark.
 
-Implements and benchmarks:
-1. Logistic Regression (Linear baseline with standardized features)
-2. Random Forest Classifier (Bagged ensemble)
-3. HistGradientBoostingClassifier (Retained mini-project baseline)
-4. LightGBM Classifier (Modern gradient boosting baseline)
-5. Multi-Layer Perceptron (Neural baseline)
+Implements:
+1. Controlled 2x2 Factorial Experiment:
+   - Exp A: HistGradientBoosting + 31 baseline features
+   - Exp B: HistGradientBoosting + 39 multimodal features
+   - Exp C: LightGBM + 31 baseline features
+   - Exp D: LightGBM + 39 multimodal features
+2. Additional Baselines: Logistic Regression, Random Forest, MLP
+3. Non-parametric Bootstrap 95% Confidence Intervals for metric differences
+4. Precision@k and Recall@k for class-imbalanced targets
 """
 
 from __future__ import annotations
@@ -25,6 +28,10 @@ from sklearn.preprocessing import StandardScaler
 
 from src.evaluation.calibration import ModelCalibrator
 from src.evaluation.metrics import compute_classification_metrics
+from src.evaluation.statistical_testing import (
+    compute_bootstrap_confidence_interval,
+    compute_precision_recall_at_k,
+)
 
 # Standard 31 mini-project features
 FEATURES_BASELINE_31 = [
@@ -36,7 +43,7 @@ FEATURES_BASELINE_31 = [
     "wind_7d_mean", "wind_7d_max", "pressure_7d_mean", "soil_7d_mean", "rain_7d_total",
 ]
 
-# Complete 39 multimodal features
+# Complete 39 multimodal features (includes real DEM terrain, fuel dryness, causal recurrence)
 FEATURES_MULTIMODAL_39 = FEATURES_BASELINE_31 + [
     "elevation_m", "slope_deg", "ruggedness_index",
     "vpd_1d", "vpd_3d_mean", "soil_drought_index",
@@ -44,129 +51,140 @@ FEATURES_MULTIMODAL_39 = FEATURES_BASELINE_31 + [
 ]
 
 
-def train_and_eval_model(
-    model_name: str,
+def train_eval_single(
+    name: str,
     estimator,
-    X_train: pd.DataFrame,
-    y_train: np.ndarray,
-    X_val: pd.DataFrame,
-    y_val: np.ndarray,
-    X_test: pd.DataFrame,
-    y_test: np.ndarray,
-    target_name: str = "fire",
+    features: list[str],
+    train_df: pd.DataFrame,
+    val_df: pd.DataFrame,
+    test_df: pd.DataFrame,
+    target_col: str = "fire",
 ) -> tuple[dict, np.ndarray, object]:
-    """Train estimator, calibrate probabilities on validation set, and evaluate on test set."""
-    print(f"Training {model_name} on {target_name} ({len(X_train):,} samples)...", flush=True)
-    estimator.fit(X_train, y_train)
+    """Train model, calibrate on validation set, evaluate on test set."""
+    X_tr = train_df[features]
+    y_tr = train_df[target_col].values
+    X_va = val_df[features]
+    y_va = val_df[target_col].values
+    X_te = test_df[features]
+    y_te = test_df[target_col].values
 
-    # Validation predictions for calibration
-    val_probs = estimator.predict_proba(X_val)[:, 1]
-    calibrator = ModelCalibrator(method="isotonic")
-    calibrator.fit(val_probs, y_val)
+    estimator.fit(X_tr, y_tr)
+    val_p = estimator.predict_proba(X_va)[:, 1]
+    calibrator = ModelCalibrator(method="isotonic").fit(val_p, y_va)
 
-    # Test predictions
-    raw_test_probs = estimator.predict_proba(X_test)[:, 1]
-    cal_test_probs = calibrator.calibrate(raw_test_probs)
+    raw_test_p = estimator.predict_proba(X_te)[:, 1]
+    cal_test_p = calibrator.calibrate(raw_test_p)
 
-    uncal_metrics = compute_classification_metrics(y_test, raw_test_probs)
-    cal_metrics = compute_classification_metrics(y_test, cal_test_probs)
+    uncal_m = compute_classification_metrics(y_te, raw_test_p)
+    cal_m = compute_classification_metrics(y_te, cal_test_p)
 
-    metrics = {
-        "model": model_name,
-        "target": target_name,
-        "n_train": len(X_train),
-        "n_test": len(X_test),
-        "uncalibrated": uncal_metrics,
-        "calibrated": cal_metrics,
-    }
-    return metrics, cal_test_probs, estimator
+    return {
+        "model_id": name,
+        "feature_count": len(features),
+        "target": target_col,
+        "uncalibrated": uncal_m,
+        "calibrated": cal_m,
+    }, cal_test_p, estimator
 
 
-def run_all_baselines(
+def run_controlled_baseline_experiments(
     train_path: Path,
     val_path: Path,
     test_path: Path,
     output_dir: Path,
     target_col: str = "fire",
-    feature_set: str = "multimodal",
 ) -> pd.DataFrame:
-    """Train and evaluate the complete baseline suite."""
-    print(f"Loading datasets: Train={train_path}, Val={val_path}, Test={test_path}...", flush=True)
+    """Run controlled 2x2 factorial experiment and benchmark suite."""
+    print("Loading datasets for controlled baseline benchmarks...", flush=True)
     train_df = pd.read_csv(train_path)
     val_df = pd.read_csv(val_path)
     test_df = pd.read_csv(test_path)
-
-    features = FEATURES_MULTIMODAL_39 if feature_set == "multimodal" else FEATURES_BASELINE_31
-
-    X_train, y_train = train_df[features], train_df[target_col].values
-    X_val, y_val = val_df[features], val_df[target_col].values
-    X_test, y_test = test_df[features], test_df[target_col].values
+    y_test = test_df[target_col].values
 
     output_dir.mkdir(parents=True, exist_ok=True)
 
-    models = {
-        "Logistic_Regression": Pipeline([
-            ("scaler", StandardScaler()),
-            ("clf", LogisticRegression(max_iter=1000, random_state=42, C=1.0)),
-        ]),
-        "Random_Forest": RandomForestClassifier(
-            n_estimators=100, max_depth=16, random_state=42, n_jobs=-1
-        ),
-        "Hist_Gradient_Boosting": HistGradientBoostingClassifier(
-            max_iter=300, learning_rate=0.05, l2_regularization=1.0, random_state=42
-        ),
-        "LightGBM": LGBMClassifier(
-            n_estimators=300, learning_rate=0.05, num_leaves=31, random_state=42, n_jobs=-1, verbose=-1
-        ),
-        "MLP_Neural_Baseline": Pipeline([
-            ("scaler", StandardScaler()),
-            ("mlp", MLPClassifier(
-                hidden_layer_sizes=(128, 64),
-                max_iter=100,
-                early_stopping=True,
-                random_state=42,
-            )),
-        ]),
-    }
+    # 1. Controlled 2x2 Factorial Configurations
+    controlled_configs = [
+        ("ExpA_HGB_31_Baseline", HistGradientBoostingClassifier(max_iter=300, learning_rate=0.05, l2_regularization=1.0, random_state=42), FEATURES_BASELINE_31),
+        ("ExpB_HGB_39_Multimodal", HistGradientBoostingClassifier(max_iter=300, learning_rate=0.05, l2_regularization=1.0, random_state=42), FEATURES_MULTIMODAL_39),
+        ("ExpC_LGBM_31_Baseline", LGBMClassifier(n_estimators=300, learning_rate=0.05, num_leaves=31, random_state=42, n_jobs=-1, verbose=-1), FEATURES_BASELINE_31),
+        ("ExpD_LGBM_39_Multimodal", LGBMClassifier(n_estimators=300, learning_rate=0.05, num_leaves=31, random_state=42, n_jobs=-1, verbose=-1), FEATURES_MULTIMODAL_39),
+        ("Logistic_Regression_39", Pipeline([("scaler", StandardScaler()), ("clf", LogisticRegression(max_iter=1000, random_state=42))]), FEATURES_MULTIMODAL_39),
+        ("Random_Forest_39", RandomForestClassifier(n_estimators=100, max_depth=16, random_state=42, n_jobs=-1), FEATURES_MULTIMODAL_39),
+    ]
 
-    all_metrics = []
-    test_predictions_df = pd.DataFrame({
+    all_results = []
+    test_preds_df = pd.DataFrame({
         "grid_lat": test_df["grid_lat"],
         "grid_lon": test_df["grid_lon"],
         "acq_date": test_df["acq_date"],
         "y_true": y_test,
         "ecological_regime": test_df.get("ecological_regime", "UNKNOWN"),
     })
+    stored_probs = {}
 
-    for name, estimator in models.items():
-        m, probs, fitted = train_and_eval_model(
-            name, estimator, X_train, y_train, X_val, y_val, X_test, y_test, target_name=target_col
-        )
-        all_metrics.append(m)
-        test_predictions_df[f"prob_{name}"] = np.round(probs, 4)
-        
-        # Save model artifact
+    for name, clf, feats in controlled_configs:
+        print(f"Training {name} ({len(feats)} features)...", flush=True)
+        res, probs, fitted = train_eval_single(name, clf, feats, train_df, val_df, test_df, target_col=target_col)
+        all_results.append(res)
+        test_preds_df[f"prob_{name}"] = np.round(probs, 4)
+        stored_probs[name] = probs
         joblib.dump(fitted, output_dir / f"{name}.joblib")
 
     # Save summary table
     summary_rows = []
-    for m in all_metrics:
-        row = {"model": m["model"], "target": m["target"]}
-        for k, v in m["calibrated"].items():
+    for r in all_results:
+        row = {"model_id": r["model_id"], "features": r["feature_count"]}
+        for k, v in r["calibrated"].items():
             row[f"cal_{k}"] = v
-        for k, v in m["uncalibrated"].items():
+        for k, v in r["uncalibrated"].items():
             row[f"raw_{k}"] = v
         summary_rows.append(row)
 
-    summary_df = pd.DataFrame(summary_rows).sort_values("cal_roc_auc", ascending=False)
+    summary_df = pd.DataFrame(summary_rows)
     summary_df.to_csv(output_dir / "baseline_comparison_metrics.csv", index=False)
-    test_predictions_df.to_csv(output_dir / "baseline_test_predictions.csv", index=False)
-    
-    with open(output_dir / "baseline_metrics.json", "w", encoding="utf-8") as f:
-        json.dump(all_metrics, f, indent=2)
+    test_preds_df.to_csv(output_dir / "baseline_test_predictions.csv", index=False)
 
-    print("\n=== Baseline Comparison (Calibrated Test Metrics on 2024-2025) ===")
-    print(summary_df[["model", "cal_accuracy", "cal_f1", "cal_roc_auc", "cal_pr_auc", "cal_brier_score", "cal_ece"]].to_string(index=False))
+    # 2. Compute Controlled 2x2 Factorial Effects & Bootstrap 95% Confidence Intervals
+    print("\nComputing Bootstrap 95% Confidence Intervals (B=1000) for Controlled 2x2 Effects...", flush=True)
+    comparisons = [
+        ("Multimodal_Effect_in_HGB", "ExpB_HGB_39_Multimodal", "ExpA_HGB_31_Baseline"),
+        ("Multimodal_Effect_in_LGBM", "ExpD_LGBM_39_Multimodal", "ExpC_LGBM_31_Baseline"),
+        ("Model_Family_Effect_in_31_Baseline", "ExpC_LGBM_31_Baseline", "ExpA_HGB_31_Baseline"),
+        ("Model_Family_Effect_in_39_Multimodal", "ExpD_LGBM_39_Multimodal", "ExpB_HGB_39_Multimodal"),
+    ]
+
+    boot_records = []
+    for label, mod_a, mod_b in comparisons:
+        p_a = stored_probs[mod_a]
+        p_b = stored_probs[mod_b]
+        for metric in ["roc_auc", "pr_auc", "brier", "f1"]:
+            ci_res = compute_bootstrap_confidence_interval(y_test, p_a, p_b, metric_name=metric, n_bootstraps=1000)
+            boot_records.append({
+                "comparison": label,
+                "model_a": mod_a,
+                "model_b": mod_b,
+                **ci_res,
+            })
+
+    boot_df = pd.DataFrame(boot_records)
+    boot_df.to_csv(output_dir / "bootstrap_confidence_intervals.csv", index=False)
+
+    # 3. Precision@k and Recall@k for Rare-Event Targets
+    print("Computing Precision@k and Recall@k...", flush=True)
+    pk_records = []
+    for name in ["ExpA_HGB_31_Baseline", "ExpB_HGB_39_Multimodal", "ExpD_LGBM_39_Multimodal"]:
+        pk_df = compute_precision_recall_at_k(y_test, stored_probs[name], k_list=[100, 250, 500, 1000, 2500])
+        pk_df["model_id"] = name
+        pk_records.append(pk_df)
+    pd.concat(pk_records, ignore_index=True).to_csv(output_dir / "precision_recall_at_k.csv", index=False)
+
+    print("\n=== Controlled 2x2 Factorial Baseline Comparison (Calibrated Test Metrics 2024-2025) ===")
+    print(summary_df[["model_id", "features", "cal_accuracy", "cal_f1", "cal_roc_auc", "cal_pr_auc", "cal_brier_score", "cal_ece"]].to_string(index=False))
+
+    print("\n=== Bootstrap 95% Confidence Intervals for Metric Differences ===")
+    print(boot_df[["comparison", "metric", "observed_delta", "ci_95_lower", "ci_95_upper", "ci_excludes_zero"]].to_string(index=False))
+
     return summary_df
 
 
@@ -177,16 +195,14 @@ def main() -> None:
     p.add_argument("--test", default="data/splits/test_chronological.csv")
     p.add_argument("--output-dir", default="results/baselines")
     p.add_argument("--target", default="fire")
-    p.add_argument("--feature-set", default="multimodal")
     args = p.parse_args()
 
-    run_all_baselines(
+    run_controlled_baseline_experiments(
         Path(args.train),
         Path(args.val),
         Path(args.test),
         Path(args.output_dir),
         target_col=args.target,
-        feature_set=args.feature_set,
     )
 
 

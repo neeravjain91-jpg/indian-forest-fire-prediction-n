@@ -1,7 +1,7 @@
 ablation_id,description,feature_count,cal_accuracy,cal_f1,cal_roc_auc,cal_pr_auc,cal_brier_score,cal_ece,uncal_roc_auc,uncal_ece
 A_Weather_1d_Only,Instantaneous 1d weather alone,6,0.5452,0.6251,0.5625,0.5437,0.2467,0.023,0.5629,0.0087
 B_Weather_MultiTimescale,Multi-timescale (1d + 3d + 7d) atmospheric drying,26,0.5531,0.6161,0.5784,0.559,0.2451,0.0198,0.5787,0.0061
-C_Weather_Plus_FireHistory,Weather history + Antecedent persistence,28,0.5632,0.6304,0.5894,0.564,0.2425,0.0203,0.5907,0.0082
-D_Weather_Plus_Terrain_Env,Weather history + Terrain geomorphology & VPD,32,0.554,0.6218,0.5798,0.5581,0.2447,0.0224,0.5806,0.0071
-E_Full_Multimodal,Full multimodal integration (39 features),39,0.5712,0.597,0.6047,0.5804,0.24,0.0136,0.6053,0.0107
-F_Full_Multimodal_Uncalibrated,Full multimodal model without post-hoc probability calibration,39,0.5695,0.5871,0.6053,0.5867,0.2399,0.0107,0.6053,0.0107
+C_Weather_Plus_FireHistory,Weather history + Antecedent persistence,28,0.57,0.5574,0.6053,0.5905,0.2406,0.0226,0.6054,0.0184
+D_Weather_Plus_Terrain_Env,Weather history + Terrain geomorphology & VPD,32,0.5565,0.61,0.5796,0.5584,0.2449,0.0205,0.5798,0.0064
+E_Full_Multimodal,Full multimodal integration (39 features),39,0.5844,0.5903,0.6218,0.6015,0.2375,0.0171,0.6231,0.015
+F_Full_Multimodal_Uncalibrated,Full multimodal model without post-hoc probability calibration,39,0.581,0.5622,0.6231,0.6114,0.2371,0.015,0.6231,0.015
