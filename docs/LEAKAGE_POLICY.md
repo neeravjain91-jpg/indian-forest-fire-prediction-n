@@ -1,50 +1,39 @@
-# Formal Data Leakage Control & Evaluation Policy
+# Data Leakage Prevention Policy
 
-## 1. Principle of Strict Causal Information Availability
+## 1. Core Principles
 
-For any prediction made at forecast reference time $T$:
-$$\text{Information Set}(\mathcal{I}_T) = \{X_i(t) \mid t \le T\}$$
-
-Under no circumstances may features include information where $t > T$.
-
-```
-TIME AXIS: ───[T - 7d]──────[T - 3d]──────[T - 1d]──────[T (Forecast Origin)] ──────[T + 24h]──────[T + 48h]───►
-               ◄────────── ALLOWED PREDICTORS ──────────►                  ◄────── PREDICTION TARGETS ──────►
-               - Weather 7d/3d/1d                                           - Fire Occurrence at T+24h
-               - Antecedent Fire Recurrence                                  - Fire Occurrence at T+48h
-               - Topography / Static Terrain                                 - Event Persistence
-               - VPD & Soil Moisture Deficit                                 - Event Displacement
-```
+Data leakage is the most pervasive failure mode in geospatial and meteorological machine learning, often leading to unrealistically optimistic reported performance that collapses upon prospective deployment. This repository enforces three absolute leakage prevention policies:
 
 ---
 
-## 2. Permitted vs. Prohibited Features
+## 2. Policy 1: Temporal Directionality & Antecedent Gating
 
-| Category | Permitted ($t \le T$) | Strictly Prohibited ($t > T$ or Contemporaneous Target Artifacts) |
-| :--- | :--- | :--- |
-| **Active Fire Detections** | Historical fire counts prior to $T$; cluster persistence up to $T$. | Fire counts at $T+24\text{h}$; FRP at target horizon; brightness temp at target horizon. |
-| **Meteorology** | ERA5 weather aggregated over $[T-168\text{h}, T]$, $[T-72\text{h}, T]$, $[T-24\text{h}, T]$. | Weather forecasts or actual weather occurring at or after $T$. |
-| **Fire Intensity (FRP)** | Historical max FRP of past events prior to $T$. | FRP of the target fire being predicted (circular reasoning / label leakage). |
-| **Vegetation / Moisture** | Soil moisture and VPD measured prior to or at $T$. | Post-ignition burn severity indices, dNBR, or post-fire vegetation drop. |
+1. **Strictly Backward-Looking Feature Windows**:
+   All 26 meteorological predictors are computed strictly over antecedent time horizons prior to or at reference observation time $T$:
+   - 1-day features: Aggregated over $[T - 24\text{h}, T]$.
+   - 3-day features: Aggregated over $[T - 72\text{h}, T]$.
+   - 7-day features: Aggregated over $[T - 168\text{h}, T]$.
+2. **Zero Forward Infiltration**: Under no circumstances do meteorological values from $t > T$ enter feature construction.
+3. **Temporal Partitioning**: The training set ($T \le 2022$), validation set ($T = 2023$), and test set ($T \ge 2024$) are separated by strict calendar boundaries.
 
 ---
 
-## 3. Spatial Leakage & Autocorrelation Mitigation
+## 3. Policy 2: Satellite Target Telemetry Exclusion
 
-Standard random $k$-fold cross-validation or random train/test splits cause severe optimistic bias because neighboring pixels ($< 50\text{ km}$) share identical synoptic weather patterns, vegetation regimes, and lightning/human ignition probabilities.
+A common flaw in remote-sensing fire models is accidentally including direct satellite sensor measurements of the fire thermal anomaly as predictive features.
 
-To enforce strict spatial integrity:
-1. **Chronological Splitting (Temporal Generalization)**:
-   - **Training Set**: 2018–2022 (5 full calendar years).
-   - **Validation Set**: 2023 (1 full calendar year).
-   - **Test Set**: 2024–2025 (2 full calendar years).
-   - No temporal overlap across splits.
-2. **Geographically Disjoint Regional Holdout (Spatial Generalization)**:
-   - India is segmented into 6 ecologically cohesive regional zones:
-     - `CENTRAL`: Deccan Plateau / Central Teak & Sal dry deciduous forest.
-     - `WESTERN_GHATS`: Southwestern montane & moist evergreen forest.
-     - `NORTHEAST`: Subtropical & temperate Indo-Burma biodiversity hotspot.
-     - `NORTH`: Himalayan foothills, Siwaliks, and subtropical pine.
-     - `EAST`: Eastern Ghats, Chota Nagpur plateau, and coastal hinterland.
-     - `NORTHWEST`: Aravalli range and semi-arid thorn scrub.
-   - Models are trained on 5 regions and tested on a completely disjoint, unseen 6th region to measure true out-of-region generalizability.
+The following variables are **strictly quarantined as non-predictive targets or metadata**:
+- **Fire Radiative Power (`frp`)**: Represents instantaneous radiant heat emission from active combustion. Excluded.
+- **Brightness Temperature (`brightness`, `bright_t31`)**: Direct thermal infrared brightness measurements. Excluded.
+- **Algorithm Confidence Flag (`confidence`)**: Derived from thermal signature contrast against background. Excluded.
+- **Sensor Telemetry (`scan`, `track`, `satellite`)**: Sensor orbit parameters. Excluded.
+
+Only spatiotemporal coordinates and independent external ERA5-Land meteorology are permitted in the predictive feature vector $X$.
+
+---
+
+## 4. Policy 3: Preprocessing & Scaling Isolation
+
+1. **No Target Leakage in Negative Sampling**: Negative (non-fire) samples are drawn only from valid spatial surveillance locations within matching temporal periods.
+2. **Dataset-Level Independence**: Tree-based algorithms (such as `HistGradientBoostingClassifier`) operate via ordinal feature binning that does not rely on global test-set statistics.
+3. **Immutability of Test Set**: The test split (2024–2025) is sealed and evaluated once without iterative test-set tuning.

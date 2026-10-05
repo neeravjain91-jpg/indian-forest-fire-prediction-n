@@ -1,80 +1,94 @@
-[
-  {
-    "ablation_id": "A_Weather_1d_Only",
-    "description": "Instantaneous 1d weather alone",
-    "feature_count": 6,
-    "cal_accuracy": 0.5452,
-    "cal_f1": 0.6251,
-    "cal_roc_auc": 0.5625,
-    "cal_pr_auc": 0.5437,
-    "cal_brier_score": 0.2467,
-    "cal_ece": 0.023,
-    "uncal_roc_auc": 0.5629,
-    "uncal_ece": 0.0087
+{
+  "full_31_features": {
+    "accuracy": 0.700111,
+    "precision": 0.684654,
+    "recall": 0.742071,
+    "f1": 0.712207,
+    "roc_auc": 0.785174,
+    "pr_auc": 0.783202,
+    "feature_count": 31,
+    "features": [
+      "grid_lat", "grid_lon", "hour", "year", "month",
+      "temp_1d", "rh_1d", "wind_1d", "pressure_1d", "soil_1d", "rain_1d",
+      "temp_3d_mean", "temp_3d_max", "temp_3d_min",
+      "rh_3d_mean", "rh_3d_min",
+      "wind_3d_mean", "wind_3d_max",
+      "pressure_3d_mean", "soil_3d_mean", "rain_3d_total",
+      "temp_7d_mean", "temp_7d_max", "temp_7d_min",
+      "rh_7d_mean", "rh_7d_min",
+      "wind_7d_mean", "wind_7d_max",
+      "pressure_7d_mean", "soil_7d_mean", "rain_7d_total"
+    ]
   },
-  {
-    "ablation_id": "B_Weather_MultiTimescale",
-    "description": "Multi-timescale (1d + 3d + 7d) atmospheric drying",
-    "feature_count": 26,
-    "cal_accuracy": 0.5531,
-    "cal_f1": 0.6161,
-    "cal_roc_auc": 0.5784,
-    "cal_pr_auc": 0.559,
-    "cal_brier_score": 0.2451,
-    "cal_ece": 0.0198,
-    "uncal_roc_auc": 0.5787,
-    "uncal_ece": 0.0061
+  "coordinates_plus_temporal": {
+    "accuracy": 0.697859,
+    "precision": 0.665552,
+    "recall": 0.795547,
+    "f1": 0.724767,
+    "roc_auc": 0.806952,
+    "pr_auc": 0.813684,
+    "feature_count": 5,
+    "features": ["grid_lat", "grid_lon", "hour", "year", "month"]
   },
-  {
-    "ablation_id": "C_Weather_Plus_FireHistory",
-    "description": "Weather history + Antecedent persistence",
+  "coordinates_plus_weather": {
+    "accuracy": 0.693354,
+    "precision": 0.673338,
+    "recall": 0.751205,
+    "f1": 0.710144,
+    "roc_auc": 0.773743,
+    "pr_auc": 0.775811,
     "feature_count": 28,
-    "cal_accuracy": 0.57,
-    "cal_f1": 0.5574,
-    "cal_roc_auc": 0.6053,
-    "cal_pr_auc": 0.5905,
-    "cal_brier_score": 0.2406,
-    "cal_ece": 0.0226,
-    "uncal_roc_auc": 0.6054,
-    "uncal_ece": 0.0184
+    "features": [
+      "grid_lat", "grid_lon",
+      "temp_1d", "rh_1d", "wind_1d", "pressure_1d", "soil_1d", "rain_1d",
+      "temp_3d_mean", "temp_3d_max", "temp_3d_min",
+      "rh_3d_mean", "rh_3d_min",
+      "wind_3d_mean", "wind_3d_max",
+      "pressure_3d_mean", "soil_3d_mean", "rain_3d_total",
+      "temp_7d_mean", "temp_7d_max", "temp_7d_min",
+      "rh_7d_mean", "rh_7d_min",
+      "wind_7d_mean", "wind_7d_max",
+      "pressure_7d_mean", "soil_7d_mean", "rain_7d_total"
+    ]
   },
-  {
-    "ablation_id": "D_Weather_Plus_Terrain_Env",
-    "description": "Weather history + Terrain geomorphology & VPD",
-    "feature_count": 32,
-    "cal_accuracy": 0.5565,
-    "cal_f1": 0.61,
-    "cal_roc_auc": 0.5796,
-    "cal_pr_auc": 0.5584,
-    "cal_brier_score": 0.2449,
-    "cal_ece": 0.0205,
-    "uncal_roc_auc": 0.5798,
-    "uncal_ece": 0.0064
+  "weather_only": {
+    "accuracy": 0.552641,
+    "precision": 0.547260,
+    "recall": 0.610061,
+    "f1": 0.576957,
+    "roc_auc": 0.575927,
+    "pr_auc": 0.561100,
+    "feature_count": 26,
+    "features": [
+      "temp_1d", "rh_1d", "wind_1d", "pressure_1d", "soil_1d", "rain_1d",
+      "temp_3d_mean", "temp_3d_max", "temp_3d_min",
+      "rh_3d_mean", "rh_3d_min",
+      "wind_3d_mean", "wind_3d_max",
+      "pressure_3d_mean", "soil_3d_mean", "rain_3d_total",
+      "temp_7d_mean", "temp_7d_max", "temp_7d_min",
+      "rh_7d_mean", "rh_7d_min",
+      "wind_7d_mean", "wind_7d_max",
+      "pressure_7d_mean", "soil_7d_mean", "rain_7d_total"
+    ]
   },
-  {
-    "ablation_id": "E_Full_Multimodal",
-    "description": "Full multimodal integration (39 features)",
-    "feature_count": 39,
-    "cal_accuracy": 0.5844,
-    "cal_f1": 0.5903,
-    "cal_roc_auc": 0.6218,
-    "cal_pr_auc": 0.6015,
-    "cal_brier_score": 0.2375,
-    "cal_ece": 0.0171,
-    "uncal_roc_auc": 0.6231,
-    "uncal_ece": 0.015
+  "coordinates_only": {
+    "accuracy": 0.697542,
+    "precision": 0.663757,
+    "recall": 0.800812,
+    "f1": 0.725872,
+    "roc_auc": 0.806778,
+    "pr_auc": 0.813427,
+    "feature_count": 2,
+    "features": ["grid_lat", "grid_lon"]
   },
-  {
-    "ablation_id": "F_Full_Multimodal_Uncalibrated",
-    "description": "Full multimodal model without post-hoc probability calibration",
-    "feature_count": 39,
-    "cal_accuracy": 0.581,
-    "cal_f1": 0.5622,
-    "cal_roc_auc": 0.6231,
-    "cal_pr_auc": 0.6114,
-    "cal_brier_score": 0.2371,
-    "cal_ece": 0.015,
-    "uncal_roc_auc": 0.6231,
-    "uncal_ece": 0.015
+  "temporal_only": {
+    "accuracy": 0.500048,
+    "precision": 0.500071,
+    "recall": 0.671467,
+    "f1": 0.573231,
+    "roc_auc": 0.500159,
+    "pr_auc": 0.500125,
+    "feature_count": 3,
+    "features": ["hour", "year", "month"]
   }
-]
+}

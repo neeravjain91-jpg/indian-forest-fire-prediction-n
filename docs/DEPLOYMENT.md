@@ -1,78 +1,56 @@
-# Operational Deployment & Production Architecture Guide
+# Deployment & Operational Guide
 
-## 1. System Overview
+## 1. Local Deployment
 
-The India Wildfire Intelligence Platform is packaged as a dual-stack application:
-1. **Scientific Backend**: Python / Flask WSGI service integrating PyTorch, LightGBM, Scikit-learn, and Shapely.
-2. **Geospatial GIS Frontend**: Real-time Leaflet GIS mapping interface with hardware-accelerated Canvas rendering, multi-horizon forecast overlays, event tracking, and retrospective replay station.
+### 1.1 Prerequisites
+- Python 3.11+
+- Virtual environment (recommended)
+
+### 1.2 Installation & Startup
+```bash
+# Clone the repository
+git clone https://github.com/neeravjain91-jpg/indian-forest-fire-prediction-n.git
+cd indian-forest-fire-prediction-n
+
+# Create and activate virtual environment
+python -m venv .venv
+source .venv/bin/activate  # On Windows: .venv\Scripts\activate
+
+# Install dependencies
+pip install -r requirements.txt
+
+# (Optional) Provide NASA FIRMS MAP Key
+export FIRMS_MAP_KEY="your_nasa_firms_key_here"  # On Windows: set FIRMS_MAP_KEY=your_nasa_firms_key_here
+
+# Launch Flask application
+python application.py
+```
+The application will start locally on `http://127.0.0.1:5000`.
 
 ---
 
-## 2. Environment Setup & Dependencies
+## 2. Cloud Serverless Deployment (Vercel)
 
-Install production requirements:
-```bash
-pip install -r requirements.txt
-```
+The application is structured for instant serverless deployment on Vercel:
 
-Core dependencies verified:
-- `numpy >= 1.26`
-- `pandas >= 2.2`
-- `scipy >= 1.13`
-- `scikit-learn >= 1.5`
-- `lightgbm >= 4.0`
-- `torch >= 2.0`
-- `shapely >= 2.0`
-- `flask >= 3.0`
-- `matplotlib >= 3.8`
-- `joblib >= 1.4`
+1. **Vercel Entrypoint**: Configured in `pyproject.toml`:
+   ```toml
+   [tool.vercel]
+   entrypoint = "application:app"
+   ```
+2. **Minimal Dependency Footprint**:
+   By strictly eliminating bulky deep-learning libraries (`torch`) and complex compiled packages, the production dependency footprint stays well within Vercel's serverless package limits (<250 MB compressed).
+3. **Ignored Artifacts**:
+   `.vercelignore` excludes large CSV datasets and raw archives from the serverless deployment artifact, deploying only the precomputed 1.15 MB model checkpoint (`results/final_model/final_hgb_model.joblib`), metrics, and UI templates.
 
 ---
 
 ## 3. Configuration & Security Protocols
 
-### NASA FIRMS Key Management
-The application accesses the NASA FIRMS Area API strictly server-side. **No API keys are ever transmitted to or stored within the browser.**
+### 3.1 NASA FIRMS API Key Management
+- The application reads `FIRMS_MAP_KEY` exclusively from server-side environment variables.
+- **Graceful Fallback (DEMO Mode)**: If `FIRMS_MAP_KEY` is not provided, the application automatically enters **DEMO Mode**, serving realistic historical active fire samples across India without failing or prompting the user.
+- **Zero Key Leakage**: The `/api/firms-status` endpoint exposes only operational state flags (`LIVE` vs. `DEMO`) and whether the boundary polygon is initialized. Raw key values are never returned to client browsers.
 
-Set the environment variable:
-* **Windows (PowerShell)**:
-  ```powershell
-  $env:FIRMS_MAP_KEY = "your_nasa_firms_map_key"
-  ```
-* **Linux / macOS (Bash)**:
-  ```bash
-  export FIRMS_MAP_KEY="your_nasa_firms_map_key"
-  ```
-* **Dotenv (.env file)**:
-  Create a `.env` file in the project root:
-  ```ini
-  FIRMS_MAP_KEY=your_nasa_firms_map_key
-  ```
-*(Note: If no key is set, the application operates in calibrated demo mode with simulated active observations over Indian forest corridors).*
-
-### Security Audit Findings & Hardening
-1. **No `/api/set-key` endpoint**: Public POST endpoints modifying server environment variables were removed.
-2. **API Timeout & Retry Backoff**: FIRMS API queries enforce a 15-second timeout and 3-attempt exponential backoff.
-3. **Response Caching**: Responses are cached in-memory with a 15-minute Time-To-Live (TTL) to avoid exceeding NASA rate limits.
-4. **Boundary Integrity**: Detections outside the sovereign boundary of India are strictly filtered using Shapely `covers` spatial indexing.
-
----
-
-## 4. Launching the Service
-
-### Development Server:
-```bash
-python application.py
-```
-Access at: `http://127.0.0.1:5000`
-
-### Production WSGI (Windows via Waitress):
-```bash
-pip install waitress
-waitress-serve --port=5000 application:app
-```
-
-### Production WSGI (Linux via Gunicorn):
-```bash
-gunicorn -w 4 -b 0.0.0.0:5000 application:app
-```
+### 3.2 Geospatial Boundary Enforcement
+All incoming satellite detections from NASA FIRMS are passed through a spatial filter (`shapely.prepared.prep(polygon)`) using the official Survey of India GeoJSON boundary (`data/processed/india_boundary.geojson`). Any coordinate outside sovereign Indian territory is filtered prior to UI transmission.
