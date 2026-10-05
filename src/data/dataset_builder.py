@@ -4,7 +4,7 @@ Corrections implemented:
 1. Real Copernicus/SRTM DEM terrain features (elevation, Horn slope, Riley TRI).
 2. Strictly causal time-indexed fire history (no future leakage: all features t < T).
 3. Connected-component event persistence target (1 only if active event continues into T+24h).
-4. Leave-One-Ecoregion-Out (LOEO) and strict chronological split generation.
+4. Leave-One-Geographic-Regime-Out (LOGRO) and strict chronological split generation.
 """
 
 from __future__ import annotations
@@ -177,7 +177,7 @@ def build_multimodal_dataset(
 
     # 6. Generate Clean Splits
     splits_dir.mkdir(parents=True, exist_ok=True)
-    print("Generating corrected chronological and Leave-One-Ecoregion-Out (LOEO) splits...", flush=True)
+    print("Generating corrected chronological and Leave-One-Geographic-Regime-Out (LOGRO) splits...", flush=True)
 
     # Chronological
     train_chrono = df[df["year"] <= 2022].copy()

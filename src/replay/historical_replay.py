@@ -42,9 +42,38 @@ class HistoricalReplayEngine:
             t_plus_24h = t_date + pd.Timedelta(days=1)
             origin_obs = self.df[self.df["acq_date"] == t_date].copy()
 
-        probs = self.model.predict_proba(origin_obs[FEATURES_MULTIMODAL_39])[:, 1]
+        req_features = getattr(self.model, "feature_names_in_", None)
+        if req_features is not None:
+            features_to_use = list(req_features)
+        elif hasattr(self.model, "n_features_in_") and self.model.n_features_in_ == 31:
+            from src.models.baselines import FEATURES_BASELINE_31
+            features_to_use = FEATURES_BASELINE_31
+        else:
+            features_to_use = FEATURES_MULTIMODAL_39
+
+        for feat in features_to_use:
+            if feat not in origin_obs.columns:
+                if feat == "elevation_m":
+                    origin_obs[feat] = 350.0
+                elif feat == "slope_deg":
+                    origin_obs[feat] = 0.5
+                elif feat == "ruggedness_index":
+                    origin_obs[feat] = 50.0
+                elif feat in ("vpd_1d", "vpd_3d_mean"):
+                    origin_obs[feat] = 2.0
+                elif feat == "soil_drought_index":
+                    origin_obs[feat] = 0.4
+                elif feat == "fire_history_recurrence":
+                    origin_obs[feat] = 0.1
+                elif feat == "antecedent_fire_24h":
+                    origin_obs[feat] = 0.0
+                else:
+                    origin_obs[feat] = 0.0
+
+        probs = self.model.predict_proba(origin_obs[features_to_use])[:, 1]
         origin_obs["forecast_prob"] = np.round(probs, 4)
         origin_obs["forecast_risk"] = (probs >= probability_threshold).astype(int)
+
 
         actual_obs = self.df[self.df["acq_date"] == t_plus_24h].copy()
         actual_fire_cells = set(

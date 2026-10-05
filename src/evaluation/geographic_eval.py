@@ -129,7 +129,7 @@ def run_loeo_generalization(
 
     agg_df.to_csv(output_dir / "loeo_aggregate_summary.csv", index=False)
 
-    print("\n=== Leave-One-Ecoregion-Out (LOEO) Geographic Results Summary ===")
+    print("\n=== Leave-One-Geographic-Regime-Out (LOGRO) Geographic Results Summary ===")
     print(summary_df[["held_out_region", "model_id", "accuracy", "f1", "roc_auc", "pr_auc", "brier_score", "ece"]].to_string(index=False))
 
     print("\n=== Cross-Regional Macro Mean ± Standard Deviation ===")

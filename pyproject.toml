@@ -1,21 +1,24 @@
 [project]
-name = "indian-forest-fire-prediction"
-version = "0.1.0"
-description = "India Forest Fire Prediction & Live Surveillance System"
+name = "major-forest-fire"
+version = "0.2.0"
+description = "Event-Centric Multimodal Spatiotemporal Wildfire Intelligence for India"
 readme = "README.md"
 requires-python = ">=3.11"
+license = { text = "MIT" }
 dependencies = [
     "flask>=3.0",
     "numpy>=1.26",
     "pandas>=2.2",
+    "scipy>=1.13",
     "scikit-learn>=1.5",
+    "lightgbm>=4.0",
+    "torch>=2.0",
+    "matplotlib>=3.8",
     "requests>=2.32",
     "joblib>=1.4",
     "shapely>=2.0",
+    "pytest>=8.0",
 ]
-
-[tool.vercel]
-entrypoint = "application:app"
 
 [tool.pytest.ini_options]
 pythonpath = ["."]

@@ -4,7 +4,7 @@ Generates:
 1. Fig 1: ROC and Precision-Recall Curves (ROC/PR) for Controlled 2x2 Factorial
 2. Fig 2: Probability Calibration & Reliability Diagrams
 3. Fig 3: Forest Plot of Bootstrap 95% Confidence Intervals
-4. Fig 4: Leave-One-Ecoregion-Out (LOEO) Geographic Benchmark
+4. Fig 4: Leave-One-Geographic-Regime-Out (LOGRO) Geographic Benchmark
 5. Fig 5: Fire Event Dynamics & Spatial Clustering Distribution
 """
 
@@ -122,7 +122,7 @@ def plot_bootstrap_forest_plot(boot_csv: Path, output_path: Path):
 
 
 def plot_loeo_geographic_spread(loeo_csv: Path, output_path: Path):
-    """Plot Leave-One-Ecoregion-Out (LOEO) performance across all 6 Indian biomes."""
+    """Plot Leave-One-Geographic-Regime-Out (LOGRO) performance across all 6 predefined geographic fire regimes."""
     df = pd.read_csv(loeo_csv)
     fig, ax = plt.subplots(figsize=(9, 4.8))
 

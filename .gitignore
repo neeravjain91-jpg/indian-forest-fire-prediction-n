@@ -1,15 +1,26 @@
+# Byte-compiled / optimized files
 __pycache__/
 *.py[cod]
+*$py.class
 
+# Virtual environments
 .venv/
 venv/
+ENV/
+env/
+
+# Environment and editor metadata
 .env
 .DS_Store
 .ipynb_checkpoints/
+*.swp
+*.swo
 
-# Cache / temporary files
-/cache/
+# Test & coverage caches
 .pytest_cache/
+/cache/
+.coverage
+htmlcov/
 
 # Python temporary/model files
 *.pkl
@@ -20,6 +31,22 @@ data/features/
 data/splits/
 data/interim/
 data/raw/
+
+# Raw raster downloads and archive bundles (prevent multi-gigabyte repo bloat)
+*.zip
+*.tar
+*.tar.gz
+*.tif
+*.tiff
+*.grib
+*.nc
+
+# Working manuscript drafts & binary office documents
+*.docx
+*.pdf
+
+# Pilot / scratch benchmarks
+fire_weather_features_*.csv
 
 # Exclude auxiliary bulky model checkpoints (final HGB model in results/final_model is preserved)
 results/baselines/*.joblib

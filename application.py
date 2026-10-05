@@ -1,19 +1,20 @@
 """India-Wide Event-Centric Multimodal Wildfire Intelligence Application.
 
-Integrates:
+Research Demonstration Platform:
 1. Real-time NASA FIRMS Satellite Surveillance (VIIRS NRT)
 2. Multimodal Spatiotemporal Forward Risk Forecasting (T+24h, T+48h)
 3. Spatiotemporal Fire Event Tracking & Cluster Trajectories
 4. Prospective Historical Replay & Spatial Verification Station
 5. Spatially Disjoint Regional Generalization & Uncertainty Diagnostics
+
+Notice: Developed strictly for academic research and methodology evaluation.
+Not an operational disaster dispatch, emergency alert, or civil warning system.
 """
 
 from __future__ import annotations
 
-import json
 import logging
 from pathlib import Path
-from typing import Any, Dict
 
 import joblib
 import numpy as np
@@ -21,12 +22,6 @@ import pandas as pd
 from flask import Flask, jsonify, render_template, request, send_file
 
 from firms_service import BOUNDARY_PATH, FIRMSService
-from src.data.environmental import (
-    assign_ecological_regime,
-    compute_soil_drought_index,
-    compute_vapor_pressure_deficit,
-)
-from src.data.terrain import get_real_terrain_features
 from src.models.baselines import FEATURES_BASELINE_31, FEATURES_MULTIMODAL_39
 from src.replay.historical_replay import HistoricalReplayEngine
 
@@ -77,9 +72,11 @@ else:
 firms_service = FIRMSService()
 
 replay_engine = None
-if DATA_PATH.exists() and (MODEL_EXP_D.exists() or MODEL_EXP_A.exists()):
-    m_path = MODEL_EXP_D if MODEL_EXP_D.exists() else MODEL_EXP_A
-    replay_engine = HistoricalReplayEngine(DATA_PATH, m_path, EVENTS_PATH)
+if DATA_PATH.exists():
+    m_path = MODEL_EXP_D if MODEL_EXP_D.exists() else (MODEL_EXP_A if MODEL_EXP_A.exists() else MODEL_LEGACY)
+    if m_path.exists():
+        replay_engine = HistoricalReplayEngine(DATA_PATH, m_path, EVENTS_PATH)
+
 
 
 @app.route("/")
